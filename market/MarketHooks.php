@@ -102,7 +102,7 @@ class MarketHooks
             ->value('config');
         $config = $config ? json_decode($config, true) : [];
 
-        $defaultConfig = (new \addons\market\Market())->getDefaultConfig();
+        $defaultConfig = (new \addons\market\MarketPlugin())->getDefaultConfig();
         return array_merge($defaultConfig, $config);
     }
 }

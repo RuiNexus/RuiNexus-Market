@@ -10,7 +10,7 @@ class MarketApiController
             ->where('name', 'Market')->where('module', 'addons')
             ->value('config');
         $dbConfig = $dbConfig ? json_decode($dbConfig, true) : [];
-        $Market = new \addons\market\Market();
+        $Market = new \addons\market\MarketPlugin();
         return array_merge($Market->getDefaultConfig(), $dbConfig);
     }
 
