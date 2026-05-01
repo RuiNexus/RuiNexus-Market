@@ -1,0 +1,24 @@
+<?php
+
+return [
+    'market_config_saved' => '配置保存成功',
+    'market_audit_pass'   => '审核通过',
+    'market_audit_reject' => '审核驳回',
+    'market_deleted'      => '删除成功',
+    'market_featured_on'  => '已设为推荐',
+    'market_featured_off' => '已取消推荐',
+    'market_status_0'     => '待审核',
+    'market_status_1'     => '上架中',
+    'market_status_2'     => '已售出',
+    'market_status_3'     => '已下架',
+    'market_status_4'     => '已删除',
+    'market_pay_online'   => '线上支付',
+    'market_pay_offline'  => '线下交易',
+    'market_order_status_0' => '待付款',
+    'market_order_status_1' => '已付款',
+    'market_order_status_2' => '已转移',
+    'market_order_status_3' => '已完成',
+    'market_order_status_4' => '已取消',
+    'market_order_status_5' => '退款中',
+    'market_order_status_6' => '已退款',
+];
