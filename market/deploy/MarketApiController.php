@@ -11,17 +11,96 @@ class MarketApiController
 
     private function getUid()
     {
-        $uid = cmf_get_current_user_id();
-        if (!$uid) {
-            $uid = session('user.id');
+        $uid = $this->verifyJwtToken();
+        if ($uid) {
+            return $uid;
         }
-        if (!$uid) {
-            $token = input('token', '');
-            if ($token) {
-                $uid = \think\Db::name('clients')->where('token', $token)->value('id');
-            }
+
+        $uid = cmf_get_current_user_id();
+        if ($uid) {
+            return $uid;
+        }
+
+        $uid = session('user.id');
+        if ($uid) {
+            return $uid;
+        }
+
+        $token = input('token', '');
+        if ($token) {
+            $uid = \think\Db::name('clients')->where('token', $token)->value('id');
         }
         return intval($uid);
+    }
+
+    private function verifyJwtToken()
+    {
+        $jwt = $this->extractJwt();
+        if (!$jwt) {
+            return 0;
+        }
+
+        if (count(explode('.', $jwt)) != 3) {
+            return 0;
+        }
+
+        $cachedUid = \think\facade\Cache::get('client_user_login_token_' . $jwt);
+        if (!$cachedUid) {
+            return 0;
+        }
+
+        try {
+            $key = config('jwtkey');
+            $decoded = \Firebase\JWT\JWT::decode($jwt, $key, ['HS256']);
+            $decoded = json_decode(json_encode($decoded), true);
+        } catch (\Exception $e) {
+            return 0;
+        }
+
+        $uid = $decoded['userinfo']['id'] ?? 0;
+        if (!$uid) {
+            return 0;
+        }
+
+        if ($cachedUid != $uid) {
+            return 0;
+        }
+
+        $passUpdateTime = \think\facade\Cache::get('client_user_update_pass_' . $uid);
+        if ($passUpdateTime && ($decoded['nbf'] ?? 0) < $passUpdateTime) {
+            return 0;
+        }
+
+        $ipCheck = configuration('home_ip_check');
+        if ($ipCheck == 1 && get_client_ip() !== ($decoded['ip'] ?? '')) {
+            return 0;
+        }
+
+        $clientStatus = \think\Db::name('clients')->where('id', $uid)->value('status');
+        if ($clientStatus != 1) {
+            return 0;
+        }
+
+        return intval($uid);
+    }
+
+    private function extractJwt()
+    {
+        $cookieJwt = userGetCookie();
+        if ($cookieJwt) {
+            return $cookieJwt;
+        }
+
+        $header = request()->header();
+        $auth = $header['authorization'] ?? $header['Authorization'] ?? '';
+        if ($auth) {
+            $parts = explode(' ', $auth);
+            if (count($parts) == 2 && in_array(strtoupper($parts[0]), ['JWT', 'BEARER'])) {
+                return $parts[1];
+            }
+        }
+
+        return null;
     }
 
     private function needLogin()
