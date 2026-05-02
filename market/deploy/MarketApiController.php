@@ -290,6 +290,10 @@ class MarketApiController
             return json(['status' => 400, 'msg' => '不能购买自己的商品']);
         }
 
+        $sellerName = \think\Db::name('clients')
+            ->where('id', $listing['uid'])
+            ->value('username') ?: '未知卖家';
+
         $config = $this->getConfig();
 
         if ($payType == 'offline' && intval($config['allow_offline'] ?? 1) != 1) {
@@ -347,6 +351,13 @@ class MarketApiController
                 ]);
             }
 
+            $invoiceNotes = sprintf(
+                '交易市场购买产品 产品ID:%d 产品名称:%s 卖家名称:%s',
+                $listing['product_id'],
+                $listing['title'],
+                $sellerName
+            );
+
             $invoiceData = [
                 'uid'         => $uid,
                 'create_time' => time(),
@@ -355,7 +366,7 @@ class MarketApiController
                 'total'       => $listing['sale_price'],
                 'status'      => 'Unpaid',
                 'type'        => 'market',
-                'notes'       => 'RuiNexus Market - ' . $listing['title'],
+                'notes'       => $invoiceNotes,
             ];
 
             $invoiceId = \think\Db::name('invoices')->insertGetId($invoiceData);
@@ -365,7 +376,7 @@ class MarketApiController
                 'invoice_id' => $invoiceId,
                 'rel_id'     => $listing['host_id'],
                 'type'       => 'market',
-                'description' => '二手服务器 - ' . $listing['title'],
+                'description' => $invoiceNotes,
                 'amount'     => $listing['sale_price'],
                 'due_time'   => $expireTime,
             ];
