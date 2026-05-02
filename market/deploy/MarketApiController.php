@@ -367,7 +367,7 @@ class MarketApiController
                 'subtotal'    => $listing['sale_price'],
                 'total'       => $listing['sale_price'],
                 'status'      => 'Unpaid',
-                'type'        => 'market',
+                'type'        => 'product',
                 'notes'       => $invoiceNotes,
             ];
 
