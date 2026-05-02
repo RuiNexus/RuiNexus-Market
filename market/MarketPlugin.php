@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.9.4',
+        'version'     => '1.10.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',
@@ -104,6 +104,19 @@ class MarketPlugin extends Plugin
                 'default' => '',
                 'desc'    => '前端页面公告区域显示的内容',
             ],
+            'fee_to_escrow' => [
+                'type'    => 'select',
+                'name'    => '手续费入中间账户',
+                'default' => '0',
+                'options' => ['0' => '不启用', '1' => '启用'],
+                'desc'    => '启用后，每笔交易的手续费将自动添加到中间账户余额，方便统计平台收入',
+            ],
+            'order_expire_minutes' => [
+                'type'    => 'number',
+                'name'    => '订单有效期(分钟)',
+                'default' => '15',
+                'desc'    => '买家下单后需在此时间内完成支付，超时订单自动取消并解锁商品',
+            ],
         ];
     }
 
@@ -169,6 +182,7 @@ class MarketPlugin extends Plugin
                 `status` tinyint(1) DEFAULT '0' COMMENT '0待付款1已付款2已转移3完成4取消5退款中6已退款',
                 `remark` text,
                 `create_time` int(11) DEFAULT '0',
+                `expire_time` int(11) DEFAULT '0' COMMENT '订单过期时间',
                 `pay_time` int(11) DEFAULT '0',
                 `transfer_time` int(11) DEFAULT '0',
                 `complete_time` int(11) DEFAULT '0',
@@ -249,6 +263,7 @@ class MarketPlugin extends Plugin
                 "`status` tinyint(1) DEFAULT '0' COMMENT '0待付款1已付款2已转移3完成4取消5退款中6已退款'",
                 "`remark` text",
                 "`create_time` int(11) DEFAULT '0'",
+                "`expire_time` int(11) DEFAULT '0' COMMENT '订单过期时间'",
                 "`pay_time` int(11) DEFAULT '0'",
                 "`transfer_time` int(11) DEFAULT '0'",
                 "`complete_time` int(11) DEFAULT '0'",

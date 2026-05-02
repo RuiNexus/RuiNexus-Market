@@ -41,6 +41,8 @@ $routes = [
     ['method' => 'GET',     'action' => 'my_sales',     'handler' => 'mySales'],
     ['method' => 'POST',    'action' => 'favorite',     'handler' => 'favorite',  'args' => [intval($_GET['id'] ?? 0)]],
     ['method' => 'GET',     'action' => 'favorites',    'handler' => 'favorites'],
+    ['method' => 'GET',     'action' => 'fields',       'handler' => 'fields'],
+    ['method' => 'POST',    'action' => 'cancelOrder',  'handler' => 'cancelOrder'],
 ];
 
 $matched = false;

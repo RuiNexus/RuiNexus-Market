@@ -1,6 +1,6 @@
 # RuiNexus Market API 接口文档
 
-> 版本: v1.9.2 | 开发者: RuiNexus / YeHuaiJing
+> 版本: v1.10.0 | 开发者: RuiNexus / YeHuaiJing
 
 ---
 
@@ -188,7 +188,8 @@
 
 ### 4. 购买商品 — `POST ?action=buy` 🔒
 
-> 🔒 需要 JWT 鉴权
+> 🔒 需要 JWT 鉴权  
+> ⚡ v1.10.0: 新增锁定机制 — 下单后锁定商品，15分钟过期自动取消
 
 **请求参数**:
 
@@ -201,7 +202,13 @@
 ```json
 {
   "status": 200,
-  "data": { "order_id": 1, "invoice_id": 10, "pay_type": "online", "pay_url": "https://www.xxx.com/viewbilling?id=10" }
+  "data": {
+    "order_id": 1,
+    "invoice_id": 10,
+    "pay_type": "online",
+    "pay_url": "https://www.xxx.com/viewbilling?id=10",
+    "expire_at": 1746123600
+  }
 }
 ```
 
@@ -209,10 +216,42 @@
 ```json
 {
   "status": 200,
-  "data": { "order_id": 1, "pay_type": "offline" },
+  "data": { "order_id": 1, "pay_type": "offline", "expire_at": 1746123600 },
   "msg": "下单成功，请联系卖家完成交易"
 }
 ```
+
+> `expire_at`: Unix时间戳，超时未支付订单自动取消并解锁商品  
+> 防止重复下单：同一买家对同一商品不能重复创建有效订单  
+> 惰性清理：每次调用 buy 时自动取消该商品上已过期的订单
+
+---
+
+### 4.1 取消订单 — `POST ?action=cancelOrder` 🔒
+
+> 🔒 需要 JWT 鉴权  
+> ⚡ v1.10.0 新增
+
+买家主动取消待支付订单，同时解锁商品。
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| order_id | int | ✓ | 订单ID |
+
+**响应示例**:
+```json
+{ "status": 200, "msg": "订单已取消" }
+```
+
+**错误响应**:
+```json
+{ "status": 400, "msg": "订单状态不允许取消" }
+```
+
+> 仅 `status=0`(待付款) 的订单可取消，取消后自动解锁对应商品  
+> 线上订单同时软删除关联的魔方发票
 
 ---
 
@@ -699,6 +738,8 @@
 | need_audit | int | 0直接上架 / 1需要审核 |
 | allow_offline | int | 0禁止 / 1允许线下交易 |
 | escrow_uid | int | 中间账户UID(0不启用) |
+| fee_to_escrow | int | 0不启用 / 1手续费入中间账户 |
+| order_expire_minutes | int | 订单有效期(分钟)，默认15 |
 | product_blacklist | string | 禁止交易的产品ID(逗号分隔) |
 | notice_content | string | 公告内容 |
 
@@ -848,6 +889,7 @@
 | 2 | 已售出 | 交易已完成 |
 | 3 | 已下架 | 卖家自行下架或管理员驳回 |
 | 4 | 已删除 | 软删除(不在列表中显示) |
+| 5 | 交易锁定中 | 有买家已下单待支付(无法被其他用户购买) |
 
 ---
 
@@ -855,6 +897,10 @@
 
 | status | 含义 |
 |--------|------|
-| 0 | 待付款/待确认 |
-| 1 | 已完成 |
-| 2 | 已取消 |
+| 0 | 待付款 |
+| 1 | 已付款 |
+| 2 | 已转移 |
+| 3 | 已完成 |
+| 4 | 已取消 |
+| 5 | 退款中 |
+| 6 | 已退款 |

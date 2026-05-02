@@ -276,6 +276,8 @@ class MarketApiController
             return json(['status' => 400, 'msg' => '参数错误']);
         }
 
+        \addons\market\model\MarketModel::cancelExpiredOrders($listingId);
+
         $listing = \think\Db::name('market_listing')->where('id', $listingId)->find();
         if (!$listing || $listing['status'] != 1) {
             return json(['status' => 400, 'msg' => '商品已下架或已售出']);
@@ -290,8 +292,25 @@ class MarketApiController
             return json(['status' => 400, 'msg' => '当前不支持线下交易']);
         }
 
+        $expireMinutes = intval($config['order_expire_minutes'] ?? 15);
+        if ($expireMinutes <= 0) {
+            $expireMinutes = 15;
+        }
+        $expireTime = time() + $expireMinutes * 60;
+
         \think\Db::startTrans();
         try {
+            $exists = \think\Db::name('market_order')
+                ->where('listing_id', $listingId)
+                ->where('status', 0)
+                ->where('buyer_uid', $uid)
+                ->where('expire_time', '>', time())
+                ->count();
+            if ($exists > 0) {
+                \think\Db::rollback();
+                return json(['status' => 400, 'msg' => '您已有该商品的待支付订单，请先完成或取消']);
+            }
+
             $orderData = [
                 'listing_id'  => $listingId,
                 'host_id'     => $listing['host_id'],
@@ -304,20 +323,22 @@ class MarketApiController
                 'pay_type'    => $payType,
                 'status'      => 0,
                 'create_time' => time(),
+                'expire_time' => $expireTime,
             ];
 
             $orderId = \think\Db::name('market_order')->insertGetId($orderData);
 
-            \think\Db::name('market_listing')->where('id', $listingId)->update([
-                'status'      => 2,
-                'update_time' => time(),
-            ]);
+            \addons\market\model\MarketModel::lockListing($listingId);
 
             if ($payType == 'offline') {
                 \think\Db::commit();
                 return json([
                     'status' => 200,
-                    'data'   => ['order_id' => $orderId, 'pay_type' => 'offline'],
+                    'data'   => [
+                        'order_id'  => $orderId,
+                        'pay_type'  => 'offline',
+                        'expire_at' => $expireTime,
+                    ],
                     'msg'    => '下单成功，请联系卖家完成交易',
                 ]);
             }
@@ -325,7 +346,7 @@ class MarketApiController
             $invoiceData = [
                 'uid'         => $uid,
                 'create_time' => time(),
-                'due_time'    => time(),
+                'due_time'    => $expireTime,
                 'subtotal'    => $listing['sale_price'],
                 'total'       => $listing['sale_price'],
                 'status'      => 'Unpaid',
@@ -342,7 +363,7 @@ class MarketApiController
                 'type'       => 'market',
                 'description' => '二手服务器 - ' . $listing['title'],
                 'amount'     => $listing['sale_price'],
-                'due_time'   => strtotime('+1 day'),
+                'due_time'   => $expireTime,
             ];
             \think\Db::name('invoice_items')->insert($itemData);
 
@@ -359,12 +380,57 @@ class MarketApiController
                     'invoice_id' => $invoiceId,
                     'pay_type'   => 'online',
                     'pay_url'    => rtrim($rootUrl, '/') . '/viewbilling?id=' . $invoiceId,
+                    'expire_at'  => $expireTime,
                 ],
             ]);
 
         } catch (\Exception $e) {
             \think\Db::rollback();
             return json(['status' => 400, 'msg' => '下单失败: ' . $e->getMessage()]);
+        }
+    }
+
+    public function cancelOrder()
+    {
+        $uid = $this->needLogin();
+        $orderId = intval(input('order_id'));
+
+        if ($orderId <= 0) {
+            return json(['status' => 400, 'msg' => '参数错误']);
+        }
+
+        $order = \think\Db::name('market_order')->where('id', $orderId)->find();
+        if (!$order) {
+            return json(['status' => 400, 'msg' => '订单不存在']);
+        }
+        if ($order['buyer_uid'] != $uid) {
+            return json(['status' => 400, 'msg' => '无权操作此订单']);
+        }
+        if ($order['status'] != 0) {
+            return json(['status' => 400, 'msg' => '订单状态不允许取消']);
+        }
+
+        \think\Db::startTrans();
+        try {
+            if ($order['invoice_id'] > 0) {
+                \think\Db::name('invoices')
+                    ->where('id', $order['invoice_id'])
+                    ->useSoftDelete('delete_time', time())
+                    ->delete();
+            }
+
+            \think\Db::name('market_order')->where('id', $orderId)->update([
+                'status' => 4,
+                'remark' => '买家主动取消',
+            ]);
+
+            \addons\market\model\MarketModel::unlockListing($order['listing_id']);
+
+            \think\Db::commit();
+            return json(['status' => 200, 'msg' => '订单已取消']);
+        } catch (\Exception $e) {
+            \think\Db::rollback();
+            return json(['status' => 400, 'msg' => '取消失败: ' . $e->getMessage()]);
         }
     }
 

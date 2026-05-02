@@ -12,6 +12,7 @@ return [
     'market_status_2'     => 'Sold',
     'market_status_3'     => 'Offline',
     'market_status_4'     => 'Deleted',
+    'market_status_5'     => 'Locked',
     'market_pay_online'   => 'Online',
     'market_pay_offline'  => 'Offline',
     'market_order_status_0' => 'Unpaid',

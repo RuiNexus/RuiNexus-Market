@@ -74,6 +74,23 @@
                     <small class="form-text text-muted">上架后自动转移产品到此账户，交易完成转移给买家，下架后退回卖家</small>
                   </div>
                 </div>
+                <div class="col-sm-6 col-12">
+                  <div class="form-group">
+                    <label>手续费入中间账户</label>
+                    <select class="form-control" name="fee_to_escrow">
+                      <option value="0" {if ($config['fee_to_escrow'] ?? '0') == '0'}selected{/if}>不启用</option>
+                      <option value="1" {if ($config['fee_to_escrow'] ?? '') == '1'}selected{/if}>启用</option>
+                    </select>
+                    <small class="form-text text-muted">启用后每笔交易手续费将加到中间账户余额，方便统计平台收入</small>
+                  </div>
+                </div>
+                <div class="col-sm-6 col-12">
+                  <div class="form-group">
+                    <label>订单有效期(分钟)</label>
+                    <input type="number" class="form-control" name="order_expire_minutes" value="{$config['order_expire_minutes'] ?? '15'}" min="1" max="1440">
+                    <small class="form-text text-muted">超时未支付的订单自动取消并解锁商品，默认15分钟</small>
+                  </div>
+                </div>
                 <div class="col-12">
                   <div class="form-group">
                     <label>禁止交易的产品ID</label>

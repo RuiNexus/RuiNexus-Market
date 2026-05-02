@@ -83,6 +83,20 @@ class MarketHooks
                 ]);
             }
 
+            $feeToEscrow = intval($config['fee_to_escrow'] ?? 0);
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($feeToEscrow == 1 && $escrowUid > 0 && $fee > 0) {
+                \think\Db::name('clients')
+                    ->where('id', $escrowUid)
+                    ->setInc('credit', $fee);
+                \credit_log([
+                    'uid'    => $escrowUid,
+                    'desc'   => 'Market交易手续费 #' . $order['id'],
+                    'amount' => $fee,
+                    'relid'  => $order['id'],
+                ]);
+            }
+
             \think\Db::commit();
 
             \think\facade\Hook::listen('transfer_service', [

@@ -106,6 +106,7 @@ class AdminIndexController extends PluginAdminBaseController
             1 => lang('market_status_1'),
             2 => lang('market_status_2'),
             3 => lang('market_status_3'),
+            5 => lang('market_status_5'),
         ];
 
         $specLabels = \think\Db::name('market_config_field')
@@ -260,7 +261,27 @@ class AdminIndexController extends PluginAdminBaseController
             return json(['status' => 400, 'msg' => '已售出的商品不能删除']);
         }
 
-        if (in_array($listing['status'], [0, 1])) {
+        if ($listing['status'] == 5) {
+            $pendingOrders = \think\Db::name('market_order')
+                ->where('listing_id', $id)
+                ->where('status', 0)
+                ->select()
+                ->toArray();
+            foreach ($pendingOrders as $order) {
+                if ($order['invoice_id'] > 0) {
+                    \think\Db::name('invoices')
+                        ->where('id', $order['invoice_id'])
+                        ->useSoftDelete('delete_time', time())
+                        ->delete();
+                }
+                \think\Db::name('market_order')->where('id', $order['id'])->update([
+                    'status' => 4,
+                    'remark' => '管理员删除商品时自动取消',
+                ]);
+            }
+        }
+
+        if (in_array($listing['status'], [0, 1, 5])) {
             $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
             if ($escrowUid > 0 && $escrowUid != $listing['uid']) {
                 try {

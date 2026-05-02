@@ -12,6 +12,7 @@ return [
     'market_status_2'     => '已售出',
     'market_status_3'     => '已下架',
     'market_status_4'     => '已删除',
+    'market_status_5'     => '交易锁定中',
     'market_pay_online'   => '线上支付',
     'market_pay_offline'  => '线下交易',
     'market_order_status_0' => '待付款',

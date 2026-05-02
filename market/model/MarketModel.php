@@ -122,4 +122,53 @@ class MarketModel extends Model
         $config = self::marketConfig();
         return intval($config['escrow_uid'] ?? 0);
     }
+
+    public static function lockListing($listingId)
+    {
+        \think\Db::name('market_listing')->where('id', $listingId)->update([
+            'status'      => 5,
+            'update_time' => time(),
+        ]);
+    }
+
+    public static function unlockListing($listingId)
+    {
+        \think\Db::name('market_listing')->where('id', $listingId)->update([
+            'status'      => 1,
+            'update_time' => time(),
+        ]);
+    }
+
+    public static function cancelExpiredOrders($listingId = null)
+    {
+        $expireMinutes = intval(self::marketConfigValue('order_expire_minutes', 15));
+
+        $query = \think\Db::name('market_order')
+            ->where('status', 0);
+        if ($listingId) {
+            $query->where('listing_id', $listingId);
+        }
+        $expiredOrders = $query->where('expire_time', '>', 0)
+            ->where('expire_time', '<', time())
+            ->select()
+            ->toArray();
+
+        foreach ($expiredOrders as $order) {
+            if ($order['invoice_id'] > 0) {
+                \think\Db::name('invoices')
+                    ->where('id', $order['invoice_id'])
+                    ->useSoftDelete('delete_time', time())
+                    ->delete();
+            }
+
+            \think\Db::name('market_order')->where('id', $order['id'])->update([
+                'status' => 4,
+                'remark' => '订单超时自动取消',
+            ]);
+
+            self::unlockListing($order['listing_id']);
+        }
+
+        return count($expiredOrders);
+    }
 }
