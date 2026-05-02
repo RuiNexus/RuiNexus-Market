@@ -92,7 +92,7 @@
 
 ### 2. 商品列表 — `GET ?action=list` 🔓
 
-> 🔓 无需登录
+> 🔓 无需登录（登录后额外返回每条记录的 `is_favorited` 字段）
 
 **请求参数**:
 
@@ -131,7 +131,8 @@
         "billing_cycle": "monthly",
         "original_amount": "100.00",
         "remaining_days": 30,
-        "domainstatus": "Active"
+        "domainstatus": "Active",
+        "is_favorited": false
       }
     ],
     "spec_labels": { "cpu": "CPU核心", "windows": "是否支持Windows" }

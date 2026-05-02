@@ -118,6 +118,7 @@ class MarketApiController
     public function list()
     {
         $param = input();
+        $uid    = $this->getUid();
 
         $page   = max(1, intval($param['page'] ?? 1));
         $size   = max(1, min(50, intval($param['size'] ?? 20)));
@@ -185,6 +186,14 @@ class MarketApiController
         $specLabels = \think\Db::name('market_config_field')
             ->column('field_label', 'field_name');
 
+        $favIds = [];
+        if ($uid) {
+            $favIds = \think\Db::name('market_favorite')
+                ->where('uid', $uid)
+                ->whereIn('listing_id', array_column($list, 'id'))
+                ->column('listing_id');
+        }
+
         foreach ($list as &$v) {
             $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
             $host   = $hosts[$hostId] ?? [];
@@ -198,6 +207,7 @@ class MarketApiController
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['is_favorited'] = $uid ? in_array($v['id'], $favIds) : false;
         }
 
         return json([
