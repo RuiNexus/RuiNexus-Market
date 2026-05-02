@@ -127,6 +127,9 @@ class MarketApiController
             $hosts = array_column($hosts, null, 'id');
         }
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
             $host   = $hosts[$hostId] ?? [];
@@ -136,15 +139,17 @@ class MarketApiController
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['spec_labels'] = $specLabels;
         }
 
         return json([
             'status' => 200,
             'data'   => [
-                'total' => $total,
-                'page'  => $page,
-                'size'  => $size,
-                'list'  => $list,
+                'total'  => $total,
+                'page'   => $page,
+                'size'   => $size,
+                'list'   => $list,
+                'spec_labels' => $specLabels,
             ],
         ]);
     }
@@ -170,6 +175,8 @@ class MarketApiController
         }
         $listing['host_domainstatus'] = $host['domainstatus'] ?? '';
         $listing['spec_data'] = $listing['spec_data'] ? json_decode($listing['spec_data'], true) : null;
+        $listing['spec_labels'] = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
 
         $seller = \think\Db::name('clients')->field('id,username')
             ->where('id', $listing['uid'])->find();
@@ -554,11 +561,15 @@ class MarketApiController
             ->where('uid', $uid)->where('status', '<>', 4)
             ->order('id', 'desc')->page($page, $size)->select()->toArray();
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['spec_labels'] = $specLabels;
         }
 
-        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list]]);
+        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
     }
 
     public function myOrders()
@@ -643,11 +654,15 @@ class MarketApiController
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])
             ->order('f.id', 'desc')->page($page, $size)->select()->toArray();
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['spec_labels'] = $specLabels;
         }
 
-        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list]]);
+        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
     }
 
     public function fields()

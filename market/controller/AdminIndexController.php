@@ -113,11 +113,15 @@ class AdminIndexController extends PluginAdminBaseController
             3 => lang('market_status_3'),
         ];
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $v['status_text'] = $statusMap[$v['status']] ?? '';
             $v['seller'] = \think\Db::name('clients')
                 ->where('id', $v['uid'])->value('username');
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['spec_labels'] = $specLabels;
         }
 
         return json([
@@ -127,6 +131,7 @@ class AdminIndexController extends PluginAdminBaseController
                 'page'  => $page,
                 'limit' => $limit,
                 'list'  => $list,
+                'spec_labels' => $specLabels,
             ],
         ]);
     }
