@@ -649,4 +649,106 @@ class AdminIndexController extends PluginAdminBaseController
 
         return json(['status' => 200, 'data' => ['id' => $id], 'msg' => '上架成功']);
     }
+
+    public function jwtCheck()
+    {
+        $jwt = input('token', '');
+        if (empty($jwt)) {
+            return json(['status' => 400, 'msg' => '请粘贴 JWT Token']);
+        }
+
+        $steps = [];
+
+        $steps[] = ['step' => 1, 'name' => 'JWT 格式校验', 'pass' => false, 'msg' => ''];
+        $parts = explode('.', $jwt);
+        if (count($parts) != 3) {
+            $steps[0]['msg'] = '格式错误：JWT 必须为3段（header.payload.signature）';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[0]['pass'] = true;
+        $steps[0]['msg'] = '格式正确';
+
+        $steps[] = ['step' => 2, 'name' => 'Cache 存在检查', 'pass' => false, 'msg' => ''];
+        $cachedUid = \think\facade\Cache::get('client_user_login_token_' . $jwt);
+        if (!$cachedUid) {
+            $steps[1]['msg'] = 'Cache 中不存在此 Token（用户可能已注销或 Token 过期）';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[1]['pass'] = true;
+        $steps[1]['msg'] = 'Cache 命中，uid=' . $cachedUid;
+
+        $steps[] = ['step' => 3, 'name' => 'JWT 签名解码', 'pass' => false, 'msg' => ''];
+        try {
+            $key = config('jwtkey');
+            $decoded = \Firebase\JWT\JWT::decode($jwt, $key, ['HS256']);
+            $decoded = json_decode(json_encode($decoded), true);
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            $steps[2]['msg'] = '签名无效（JWT 被篡改或 jwtkey 不匹配）';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            $steps[2]['msg'] = 'Token 已过期';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        } catch (\Exception $e) {
+            $steps[2]['msg'] = '解码失败：' . $e->getMessage();
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[2]['pass'] = true;
+        $steps[2]['msg'] = '签名验证通过';
+
+        $steps[] = ['step' => 4, 'name' => 'Cache uid 匹配', 'pass' => false, 'msg' => ''];
+        $uid = $decoded['userinfo']['id'] ?? 0;
+        if (!$uid) {
+            $steps[3]['msg'] = 'JWT 中未包含 userinfo.id';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        if ($cachedUid != $uid) {
+            $steps[3]['msg'] = "Cache uid({$cachedUid}) ≠ JWT uid({$uid})，不匹配";
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[3]['pass'] = true;
+        $steps[3]['msg'] = "uid 匹配：{$uid}";
+
+        $steps[] = ['step' => 5, 'name' => '密码变更失效检查', 'pass' => false, 'msg' => ''];
+        $passUpdateTime = \think\facade\Cache::get('client_user_update_pass_' . $uid);
+        if ($passUpdateTime && ($decoded['nbf'] ?? 0) < $passUpdateTime) {
+            $steps[4]['msg'] = '用户密码已修改，此 Token 已失效';
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[4]['pass'] = true;
+        $steps[4]['msg'] = 'Token 未因密码变更而失效';
+
+        $steps[] = ['step' => 6, 'name' => 'IP 绑定校验', 'pass' => false, 'msg' => ''];
+        $ipCheck = configuration('home_ip_check');
+        $currentIp = get_client_ip();
+        if ($ipCheck == 1 && $currentIp !== ($decoded['ip'] ?? '')) {
+            $steps[5]['msg'] = "IP 不匹配：请求IP({$currentIp}) ≠ 签发IP({$decoded['ip']})";
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[5]['pass'] = true;
+        if ($ipCheck == 1) {
+            $steps[5]['msg'] = 'IP 校验通过（已开启）';
+        } else {
+            $steps[5]['msg'] = 'IP 校验未开启，跳过';
+        }
+
+        $steps[] = ['step' => 7, 'name' => '客户端状态检查', 'pass' => false, 'msg' => ''];
+        $clientStatus = \think\Db::name('clients')->where('id', $uid)->value('status');
+        $clientUser = \think\Db::name('clients')->field('username,email')->where('id', $uid)->find();
+        if ($clientStatus != 1) {
+            $steps[6]['msg'] = "用户状态异常（status={$clientStatus}），已被禁用";
+            return json(['status' => 200, 'data' => ['valid' => false, 'steps' => $steps]]);
+        }
+        $steps[6]['pass'] = true;
+        $steps[6]['msg'] = "用户正常：{$clientUser['username']} ({$clientUser['email']})";
+
+        return json([
+            'status' => 200,
+            'data'   => [
+                'valid' => true,
+                'uid'   => $uid,
+                'user'  => $clientUser,
+                'steps' => $steps,
+            ],
+        ]);
+    }
 }

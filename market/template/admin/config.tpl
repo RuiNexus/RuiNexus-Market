@@ -152,6 +152,41 @@
               </table>
             </div>
           </div>
+
+          <hr class="my-4">
+
+          <div class="card-title">
+            <h5 class="m-0">
+              JWT 认证校验测试
+              <span class="badge badge-warning ml-2" style="font-size:12px;vertical-align:middle;">🧪 开发测试功能</span>
+            </h5>
+            <small class="text-muted">粘贴浏览器 Cookie 中的 JWT Token，逐层验证认证链路是否正常。仅用于开发调试，生产环境可移除。</small>
+          </div>
+
+          <div class="px-5 mx-auto w-75">
+            <div class="form-group">
+              <label>JWT Token <small class="text-muted">(从浏览器 Cookie 或 Authorization Header 中获取)</small></label>
+              <div class="input-group">
+                <textarea class="form-control" id="jwtTokenInput" rows="3" placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."></textarea>
+                <div class="input-group-append">
+                  <button class="btn btn-info" type="button" id="jwtCheckBtn" style="height:auto;">
+                    <i class="fas fa-check-circle"></i> 校验 JWT
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div id="jwtResult" style="display:none;">
+              <div id="jwtOverall" class="alert mb-2" style="padding:6px 12px;"></div>
+              <div id="jwtSteps" class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                  <thead class="thead-light">
+                    <tr><th style="width:40px;">#</th><th>校验项</th><th style="width:80px;">结果</th><th>详情</th></tr>
+                  </thead>
+                  <tbody id="jwtStepsBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -335,6 +370,52 @@ $(function () {
           }
         }
       });
+    });
+  });
+
+  $('#jwtCheckBtn').on('click', function () {
+    var token = $('#jwtTokenInput').val().trim();
+    if (!token) { layer.msg('请粘贴 JWT Token', {icon: 5}); return; }
+
+    var btn = $(this);
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 校验中...');
+
+    $.ajax({
+      type: 'POST',
+      url: '{:shd_addon_url("market://AdminIndex/jwtCheck")}',
+      data: { token: token },
+      dataType: 'json',
+      success: function (res) {
+        btn.prop('disabled', false).html('<i class="fas fa-check-circle"></i> 校验 JWT');
+        if (res.status == 200) {
+          var data = res.data;
+          $('#jwtResult').show();
+
+          if (data.valid) {
+            $('#jwtOverall').removeClass('alert-danger').addClass('alert-success')
+              .html('<strong><i class="fas fa-check-circle"></i> 全部校验通过！</strong> 用户：' + data.user.username + ' (' + data.user.email + ')，uid=' + data.uid);
+          } else {
+            $('#jwtOverall').removeClass('alert-success').addClass('alert-danger')
+              .html('<strong><i class="fas fa-times-circle"></i> 校验未通过</strong>，请查看下方详情定位问题');
+          }
+
+          var rows = '';
+          $.each(data.steps, function (i, step) {
+            var icon = step.pass ? '<span class="text-success font-weight-bold">✅ 通过</span>' : '<span class="text-danger font-weight-bold">❌ 失败</span>';
+            rows += '<tr><td class="center">' + step.step + '</td><td>' + step.name + '</td><td class="center">' + icon + '</td><td>' + step.msg + '</td></tr>';
+          });
+          $('#jwtStepsBody').html(rows);
+        } else {
+          $('#jwtResult').show();
+          $('#jwtOverall').removeClass('alert-success').addClass('alert-danger')
+            .html('<strong><i class="fas fa-exclamation-triangle"></i></strong> ' + (res.msg || '校验失败'));
+          $('#jwtStepsBody').html('<tr><td colspan="4" class="text-center text-muted">--</td></tr>');
+        }
+      },
+      error: function () {
+        btn.prop('disabled', false).html('<i class="fas fa-check-circle"></i> 校验 JWT');
+        layer.msg('校验请求失败', {icon: 5});
+      }
     });
   });
 });

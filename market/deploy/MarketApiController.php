@@ -11,17 +11,77 @@ class MarketApiController
 
     private function getUid()
     {
-        $uid = cmf_get_current_user_id();
-        if (!$uid) {
-            $uid = session('user.id');
+        return $this->verifyJwtToken();
+    }
+
+    private function verifyJwtToken()
+    {
+        $jwt = $this->extractJwt();
+        if (!$jwt) {
+            return 0;
         }
+
+        if (count(explode('.', $jwt)) != 3) {
+            return 0;
+        }
+
+        $cachedUid = \think\facade\Cache::get('client_user_login_token_' . $jwt);
+        if (!$cachedUid) {
+            return 0;
+        }
+
+        try {
+            $key = config('jwtkey');
+            $decoded = \Firebase\JWT\JWT::decode($jwt, $key, ['HS256']);
+            $decoded = json_decode(json_encode($decoded), true);
+        } catch (\Exception $e) {
+            return 0;
+        }
+
+        $uid = $decoded['userinfo']['id'] ?? 0;
         if (!$uid) {
-            $token = input('token', '');
-            if ($token) {
-                $uid = \think\Db::name('clients')->where('token', $token)->value('id');
+            return 0;
+        }
+
+        if ($cachedUid != $uid) {
+            return 0;
+        }
+
+        $passUpdateTime = \think\facade\Cache::get('client_user_update_pass_' . $uid);
+        if ($passUpdateTime && ($decoded['nbf'] ?? 0) < $passUpdateTime) {
+            return 0;
+        }
+
+        $ipCheck = configuration('home_ip_check');
+        if ($ipCheck == 1 && get_client_ip() !== ($decoded['ip'] ?? '')) {
+            return 0;
+        }
+
+        $clientStatus = \think\Db::name('clients')->where('id', $uid)->value('status');
+        if ($clientStatus != 1) {
+            return 0;
+        }
+
+        return intval($uid);
+    }
+
+    private function extractJwt()
+    {
+        $cookieJwt = userGetCookie();
+        if ($cookieJwt) {
+            return $cookieJwt;
+        }
+
+        $header = request()->header();
+        $auth = $header['authorization'] ?? $header['Authorization'] ?? '';
+        if ($auth) {
+            $parts = explode(' ', $auth);
+            if (count($parts) == 2 && in_array(strtoupper($parts[0]), ['JWT', 'BEARER'])) {
+                return $parts[1];
             }
         }
-        return intval($uid);
+
+        return null;
     }
 
     private function needLogin()
@@ -58,6 +118,7 @@ class MarketApiController
     public function list()
     {
         $param = input();
+        $uid    = $this->getUid();
 
         $page   = max(1, intval($param['page'] ?? 1));
         $size   = max(1, min(50, intval($param['size'] ?? 20)));
@@ -103,7 +164,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount')
+            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount,a.notes')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
@@ -125,6 +186,14 @@ class MarketApiController
         $specLabels = \think\Db::name('market_config_field')
             ->column('field_label', 'field_name');
 
+        $favIds = [];
+        if ($uid) {
+            $favIds = \think\Db::name('market_favorite')
+                ->where('uid', $uid)
+                ->whereIn('listing_id', array_column($list, 'id'))
+                ->column('listing_id');
+        }
+
         foreach ($list as &$v) {
             $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
             $host   = $hosts[$hostId] ?? [];
@@ -138,6 +207,7 @@ class MarketApiController
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+            $v['is_favorited'] = $uid ? in_array($v['id'], $favIds) : false;
         }
 
         return json([
@@ -163,6 +233,8 @@ class MarketApiController
         if (!$listing || $listing['status'] != 1) {
             return json(['status' => 404, 'msg' => '商品不存在或已下架']);
         }
+
+        unset($listing['host_domain'], $listing['host_os'], $listing['host_ip'], $listing['host_port']);
 
         \think\Db::name('market_listing')->where('id', $id)->setInc('views', 1);
 
@@ -553,6 +625,7 @@ class MarketApiController
         $total = \think\Db::name('market_listing')
             ->where('uid', $uid)->where('status', '<>', 4)->count();
         $list  = \think\Db::name('market_listing')
+            ->field('id,uid,host_id,product_id,title,description,sale_price,spec_data,product_name,product_type,billing_cycle,nextduedate,regdate,original_amount,status,is_featured,sort_order,views,notes,create_time,update_time')
             ->where('uid', $uid)->where('status', '<>', 4)
             ->order('id', 'desc')->page($page, $size)->select()->toArray();
 
@@ -643,7 +716,7 @@ class MarketApiController
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])->count();
 
         $list  = \think\Db::name('market_favorite')->alias('f')
-            ->field('l.*,f.create_time as fav_time')
+            ->field('l.id,l.uid,l.host_id,l.product_id,l.title,l.description,l.sale_price,l.spec_data,l.product_name,l.product_type,l.billing_cycle,l.nextduedate,l.regdate,l.original_amount,l.status,l.is_featured,l.sort_order,l.views,l.notes,l.create_time,l.update_time,f.create_time as fav_time')
             ->leftJoin('market_listing l', 'f.listing_id = l.id')
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])
             ->order('f.id', 'desc')->page($page, $size)->select()->toArray();
