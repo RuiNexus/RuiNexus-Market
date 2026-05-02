@@ -26,7 +26,7 @@
                   <option value="2">已售出</option>
                   <option value="3">已下架</option>
                 </select>
-                <input type="text" class="form-control" id="keywordInput" placeholder="搜索标题">
+                <input type="text" class="form-control" id="keywordInput" placeholder="搜索产品">
                 <btn class="btn btn-primary w-xs" id="searchBtn"><i class="fas fa-search"></i> 搜索</btn>
               </div>
             </div>
@@ -36,7 +36,6 @@
                 <thead class="thead-light">
                   <tr>
                     <th class="center">ID</th>
-                    <th>标题</th>
                     <th>卖家</th>
                     <th>售价</th>
                     <th>产品</th>
@@ -47,7 +46,7 @@
                   </tr>
                 </thead>
                 <tbody id="listTbody">
-                  <tr><td colspan="9" class="text-center">加载中...</td></tr>
+                  <tr><td colspan="8" class="text-center">加载中...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -110,7 +109,6 @@ function loadList(page) {
 
         html += '<tr>';
         html += '<td class="center">' + v.id + '</td>';
-        html += '<td><a href="#" title="' + (v.description || '') + '">' + v.title + '</a></td>';
         html += '<td>' + (v.seller || '') + '</td>';
         html += '<td>' + v.sale_price + '</td>';
         html += '<td>' + (v.product_name || '') + '</td>';

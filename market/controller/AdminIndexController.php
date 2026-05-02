@@ -86,7 +86,7 @@ class AdminIndexController extends PluginAdminBaseController
             $where[] = ['status', '=', $status];
         }
         if ($keyword !== '') {
-            $where[] = ['title', 'like', "%{$keyword}%"];
+            $where[] = ['product_name', 'like', "%{$keyword}%"];
         }
 
         $total = \think\Db::name('market_listing')->where($where)->count();
@@ -191,6 +191,13 @@ class AdminIndexController extends PluginAdminBaseController
         ]);
 
         if ($act === 'pass') {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $listing['uid']) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($listing['host_id'], $escrowUid);
+                } catch (\Exception $e) {
+                }
+            }
             return json(['status' => 200, 'msg' => lang('market_audit_pass')]);
         }
         return json(['status' => 200, 'msg' => lang('market_audit_reject')]);
@@ -425,6 +432,14 @@ class AdminIndexController extends PluginAdminBaseController
         ];
 
         $id = \think\Db::name('market_listing')->insertGetId($listingData);
+
+        $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+        if ($escrowUid > 0 && $escrowUid != $uid) {
+            try {
+                \addons\market\model\MarketModel::transferHost($hostId, $escrowUid);
+            } catch (\Exception $e) {
+            }
+        }
 
         return json(['status' => 200, 'data' => ['id' => $id], 'msg' => '上架成功']);
     }

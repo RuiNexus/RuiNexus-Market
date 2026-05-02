@@ -64,6 +64,13 @@
                     </select>
                   </div>
                 </div>
+                <div class="col-sm-6 col-12">
+                  <div class="form-group">
+                    <label>中间账户UID</label>
+                    <input type="number" class="form-control" name="escrow_uid" value="{$config['escrow_uid'] ?? '0'}" min="0" placeholder="0=不启用">
+                    <small class="form-text text-muted">上架后自动转移产品到此账户，交易完成转移给买家，下架后退回卖家</small>
+                  </div>
+                </div>
                 <div class="col-12">
                   <div class="form-group">
                     <label>禁止交易的产品ID</label>

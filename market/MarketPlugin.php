@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.1.0',
+        'version'     => '1.2.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',
@@ -89,6 +89,12 @@ class MarketPlugin extends Plugin
                 'name'    => '禁止交易的产品ID',
                 'default' => '',
                 'desc'    => '逗号分隔，这些产品下的host禁止上架交易',
+            ],
+            'escrow_uid' => [
+                'type'    => 'number',
+                'name'    => '中间账户UID',
+                'default' => '0',
+                'desc'    => '上架后自动将产品转移到此账户，交易完成后转移给买家，取消上架后退回卖家。设为0则不启用',
             ],
             'notice_content' => [
                 'type'    => 'textarea',

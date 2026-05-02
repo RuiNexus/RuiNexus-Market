@@ -363,6 +363,16 @@ class MarketApiController
 
         $id = \think\Db::name('market_listing')->insertGetId($listingData);
 
+        if ($initialStatus == 1) {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $uid) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($hostId, $escrowUid);
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
         $msg = $needAudit ? '发布成功，等待管理员审核' : '发布成功';
         return json(['status' => 200, 'data' => ['id' => $id], 'msg' => $msg]);
     }
@@ -429,6 +439,16 @@ class MarketApiController
             'status'      => 3,
             'update_time' => time(),
         ]);
+
+        if (in_array($listing['status'], [0, 1])) {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $uid) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($listing['host_id'], $uid);
+                } catch (\Exception $e) {
+                }
+            }
+        }
 
         return json(['status' => 200, 'msg' => '下架成功']);
     }
