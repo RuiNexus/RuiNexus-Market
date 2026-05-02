@@ -121,7 +121,6 @@ class AdminIndexController extends PluginAdminBaseController
             $v['seller'] = \think\Db::name('clients')
                 ->where('id', $v['uid'])->value('username');
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
-            $v['spec_labels'] = $specLabels;
         }
 
         return json([

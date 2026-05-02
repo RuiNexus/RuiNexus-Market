@@ -139,7 +139,6 @@ class MarketApiController
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
-            $v['spec_labels'] = $specLabels;
         }
 
         return json([
@@ -566,7 +565,6 @@ class MarketApiController
 
         foreach ($list as &$v) {
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
-            $v['spec_labels'] = $specLabels;
         }
 
         return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
@@ -659,7 +657,6 @@ class MarketApiController
 
         foreach ($list as &$v) {
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
-            $v['spec_labels'] = $specLabels;
         }
 
         return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
