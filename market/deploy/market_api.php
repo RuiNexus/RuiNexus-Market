@@ -51,6 +51,9 @@ foreach ($routes as $route) {
         try {
             $result = call_user_func_array([$controller, $route['handler']], $args);
             $data = is_string($result) ? $result : $result->getData();
+            if (!is_string($data)) {
+                $data = json_encode($data);
+            }
             $app->response->content($data)->send();
         } catch (\Exception $e) {
             $app->response->content(json_encode([
