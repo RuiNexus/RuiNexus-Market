@@ -377,7 +377,7 @@ class MarketApiController
                 'uid'        => $uid,
                 'invoice_id' => $invoiceId,
                 'rel_id'     => $listing['host_id'],
-                'type'       => 'host',
+                'type'       => 'market',
                 'description' => $invoiceNotes,
                 'amount'     => $listing['sale_price'],
                 'due_time'   => $expireTime,
