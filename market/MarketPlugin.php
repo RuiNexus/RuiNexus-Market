@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.3.1',
+        'version'     => '1.5.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',
@@ -143,6 +143,7 @@ class MarketPlugin extends Plugin
                 `is_featured` tinyint(1) DEFAULT '0' COMMENT '推荐',
                 `sort_order` int(11) DEFAULT '0',
                 `views` int(11) DEFAULT '0',
+                `notes` text COMMENT '卖家备注',
                 `create_time` int(11) DEFAULT '0',
                 `update_time` int(11) DEFAULT '0',
                 PRIMARY KEY (`id`),
@@ -184,6 +185,19 @@ class MarketPlugin extends Plugin
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `uk_uid_listing` (`uid`,`listing_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'market_config_field' => "CREATE TABLE `{$prefix}market_config_field` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `field_name` varchar(100) NOT NULL COMMENT '字段标识',
+                `field_label` varchar(255) NOT NULL COMMENT '字段显示名',
+                `field_type` varchar(20) NOT NULL DEFAULT 'input' COMMENT '字段类型: input/dropdown/radio/checkbox',
+                `field_options` text COMMENT '选项(JSON)，dropdown/radio/checkbox使用',
+                `sort_order` int(11) NOT NULL DEFAULT '0',
+                `is_required` tinyint(1) NOT NULL DEFAULT '0',
+                `create_time` int(11) DEFAULT '0',
+                `update_time` int(11) DEFAULT '0',
+                PRIMARY KEY (`id`),
+                KEY `idx_sort` (`sort_order`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ];
 
         $columnDefs = [
@@ -214,8 +228,10 @@ class MarketPlugin extends Plugin
                 "`is_featured` tinyint(1) DEFAULT '0' COMMENT '推荐'",
                 "`sort_order` int(11) DEFAULT '0'",
                 "`views` int(11) DEFAULT '0'",
+                "`notes` text COMMENT '卖家备注'",
                 "`create_time` int(11) DEFAULT '0'",
                 "`update_time` int(11) DEFAULT '0'",
+                "`spec_data` text COMMENT '自定义配置数据(JSON)'",
             ],
             'market_order' => [
                 "`id` int(11) NOT NULL AUTO_INCREMENT",
@@ -240,6 +256,17 @@ class MarketPlugin extends Plugin
                 "`uid` int(11) NOT NULL",
                 "`listing_id` int(11) NOT NULL",
                 "`create_time` int(11) DEFAULT '0'",
+            ],
+            'market_config_field' => [
+                "`id` int(11) NOT NULL AUTO_INCREMENT",
+                "`field_name` varchar(100) NOT NULL COMMENT '字段标识'",
+                "`field_label` varchar(255) NOT NULL COMMENT '字段显示名'",
+                "`field_type` varchar(20) NOT NULL DEFAULT 'input' COMMENT '字段类型: input/dropdown/radio/checkbox'",
+                "`field_options` text COMMENT '选项(JSON)，dropdown/radio/checkbox使用'",
+                "`sort_order` int(11) NOT NULL DEFAULT '0'",
+                "`is_required` tinyint(1) NOT NULL DEFAULT '0'",
+                "`create_time` int(11) DEFAULT '0'",
+                "`update_time` int(11) DEFAULT '0'",
             ],
         ];
 
