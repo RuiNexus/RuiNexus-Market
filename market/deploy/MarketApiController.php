@@ -294,7 +294,7 @@ class MarketApiController
             ->where('id', $listing['uid'])
             ->value('username') ?: '未知卖家';
 
-        $sellerName = preg_replace('/\(\d+\.\d+\.\d+\.\d+\)$/', '', $sellerName);
+        $sellerName = preg_replace('/-\w+(\(\d+\.\d+\.\d+\.\d+\))?$/', '', $sellerName);
 
         $config = $this->getConfig();
 
