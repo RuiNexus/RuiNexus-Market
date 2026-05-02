@@ -117,6 +117,8 @@ class MarketApiController
 
     public function list()
     {
+        \addons\market\model\MarketModel::cancelExpiredOrders();
+
         $param = input();
         $uid    = $this->getUid();
 
@@ -222,9 +224,11 @@ class MarketApiController
         ]);
     }
 
-    public function detail($id)
+    public function detail()
     {
-        $id = intval($id);
+        \addons\market\model\MarketModel::cancelExpiredOrders();
+
+        $id = intval(input('id'));
         if ($id <= 0) {
             return json(['status' => 400, 'msg' => '参数错误']);
         }
