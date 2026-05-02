@@ -45,6 +45,12 @@ return [
         'value' => '',
         'desc'  => '逗号分隔，这些产品下的host禁止上架交易',
     ],
+    'escrow_uid' => [
+        'type'  => 'number',
+        'name'  => '中间账户UID',
+        'value' => '0',
+        'desc'  => '上架后自动将产品转移到此账户，交易完成后转移给买家，取消上架后退回卖家。设为0则不启用',
+    ],
     'notice_content' => [
         'type'  => 'textarea',
         'name'  => '公告内容',

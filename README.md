@@ -21,29 +21,36 @@ https://github.com/RuiNexus/RuiNexus-Market
 ## 文件结构
 ```
 market/
-├── Market.php                  # 插件入口(install/uninstall/config)
-├── MarketHooks.php             # 钩子处理(invoice_paid→自动转移)
+├── MarketPlugin.php             # 插件入口(install/uninstall/config)
+├── MarketHooks.php              # 钩子处理(invoice_paid→自动转移)
+├── config.php                   # 配置项定义
+├── hooks.php                    # 钩子注册
+├── menu.php                     # 后台菜单注册
 ├── controller/
-│   └── AdminController.php     # 后台管理(审核/推荐/删除/配置)
+│   └── AdminIndexController.php # 后台管理(商品列表/订单/手动上架/配置)
 ├── model/
-│   └── MarketModel.php         # 数据模型
+│   └── MarketModel.php          # 数据模型(host转移/工具方法)
 ├── deploy/
-│   └── MarketApiController.php # 将复制到 app/api/controller/
-├── sql/
-│   └── install.sql             # 建表 SQL(4张表)
-├── lang/
-│   └── zh-cn.php               # 中文语言文件
-├── hooks.php                   # 钩子注册
-└── menu.php                    # 后台菜单注册
+│   ├── MarketApiController.php  # API控制器(部署时复制到 app/api/controller/)
+│   └── market_api.php           # 独立API入口(部署时复制到 public/)
+├── template/
+│   └── admin/
+│       ├── index.tpl            # 商品列表
+│       ├── order.tpl            # 交易订单
+│       ├── config.tpl           # 系统配置
+│       └── manual_publish.tpl   # 手动上架
+└── lang/
+    ├── zh-cn.php                # 中文语言文件
+    └── en-us.php                # 英文语言文件
 ```
 
 ## install() 流程
-1. 执行建表 SQL (sh_market_config / listing / order / favorite)
-2. 将 `deploy/MarketApiController.php` 复制到 `app/api/controller/`
-3. 将路由规则写入 `data/route/api.php`
+1. `runSql()` — 动态建表(含列级自动迁移)，不依赖 install.sql
+2. `deployApi()` — 将 `deploy/MarketApiController.php` 复制到 `app/api/controller/`
+3. `deployEntry()` — 将 `deploy/market_api.php` 复制到 `public/market_api.php`（独立入口，不依赖路由系统）
 4. PluginLogic 自动注册钩子和后台菜单
 
 ## uninstall() 流程
-1. 删除数据表
-2. 删除 `app/api/controller/MarketApiController.php`
-3. 从 `data/route/api.php` 移除路由
+1. `dropTables()` — **空操作**（保留数据，卸载重装不丢失）
+2. `removeApi()` — 删除 `app/api/controller/MarketApiController.php`
+3. `removeEntry()` — 删除 `public/market_api.php`

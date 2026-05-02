@@ -6,12 +6,7 @@ class MarketApiController
 {
     private function getConfig()
     {
-        $dbConfig = \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->value('config');
-        $dbConfig = $dbConfig ? json_decode($dbConfig, true) : [];
-        $Market = new \addons\market\MarketPlugin();
-        return array_merge($Market->getDefaultConfig(), $dbConfig);
+        return \addons\market\model\MarketModel::marketConfig();
     }
 
     private function getUid()
@@ -47,7 +42,17 @@ class MarketApiController
             'allow_offline'  => intval($config['allow_offline'] ?? 1),
             'notice_content' => $config['notice_content'] ?? '',
         ];
-        return json(['status' => 200, 'data' => $safeConfig]);
+
+        $fields = \think\Db::name('market_config_field')
+            ->order('sort_order', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+        foreach ($fields as &$f) {
+            $f['field_options'] = $f['field_options'] ? json_decode($f['field_options'], true) : null;
+        }
+
+        return json(['status' => 200, 'data' => $safeConfig, 'spec_fields' => $fields]);
     }
 
     public function list()
@@ -98,7 +103,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.host_domain,a.host_os,a.host_ip,a.host_port,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time')
+            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
@@ -117,23 +122,32 @@ class MarketApiController
             $hosts = array_column($hosts, null, 'id');
         }
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
             $host   = $hosts[$hostId] ?? [];
-            $v['remaining_days'] = 0;
-            if (!empty($host['nextduedate']) && $host['nextduedate'] > time()) {
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['remaining_days'] = null;
+            } elseif (!empty($host['nextduedate']) && $host['nextduedate'] > time()) {
                 $v['remaining_days'] = ceil(($host['nextduedate'] - time()) / 86400);
+            } else {
+                $v['remaining_days'] = 0;
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
+            $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
         }
 
         return json([
             'status' => 200,
             'data'   => [
-                'total' => $total,
-                'page'  => $page,
-                'size'  => $size,
-                'list'  => $list,
+                'total'  => $total,
+                'page'   => $page,
+                'size'   => $size,
+                'list'   => $list,
+                'spec_labels' => $specLabels,
             ],
         ]);
     }
@@ -153,11 +167,18 @@ class MarketApiController
         \think\Db::name('market_listing')->where('id', $id)->setInc('views', 1);
 
         $host = \think\Db::name('host')->where('id', $listing['host_id'])->find();
-        $listing['remaining_days'] = 0;
-        if ($host && $host['nextduedate'] > time()) {
+        $billingCycle = strtolower($listing['billing_cycle'] ?? '');
+        if (in_array($billingCycle, ['onetime', 'free'])) {
+            $listing['remaining_days'] = null;
+        } elseif ($host && $host['nextduedate'] > time()) {
             $listing['remaining_days'] = ceil(($host['nextduedate'] - time()) / 86400);
+        } else {
+            $listing['remaining_days'] = 0;
         }
         $listing['host_domainstatus'] = $host['domainstatus'] ?? '';
+        $listing['spec_data'] = $listing['spec_data'] ? json_decode($listing['spec_data'], true) : null;
+        $listing['spec_labels'] = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
 
         $seller = \think\Db::name('clients')->field('id,username')
             ->where('id', $listing['uid'])->find();
@@ -307,7 +328,7 @@ class MarketApiController
         }
 
         $product = \think\Db::name('products')
-            ->field('name,type,pay_type')
+            ->field('name,type')
             ->where('id', $host['productid'])->find();
 
         $price = \think\Db::name('pricing')
@@ -315,12 +336,9 @@ class MarketApiController
             ->where('relid', $host['productid'])
             ->find();
 
-        $originalAmount = 0;
-        if ($price && floatval($price['monthly'] ?? 0) > 0) {
-            $originalAmount = floatval($price['monthly']);
-        } elseif ($price) {
-            $originalAmount = floatval($price['onetime'] ?? 0);
-        }
+        $originalAmount = \addons\market\model\MarketModel::getPriceFromPricing(
+            $host['billingcycle'] ?? '', $price
+        );
 
         $title       = input('title', $product['name'] ?? '');
         $description = input('description', '');
@@ -330,14 +348,21 @@ class MarketApiController
             return json(['status' => 400, 'msg' => '请输入有效的售价']);
         }
 
+        $specData = input('spec_data', '', null);
+        if ($specData !== '' && is_string($specData)) {
+            $decoded = json_decode($specData, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $specData = $decoded;
+            }
+        } elseif (is_array($specData)) {
+        } else {
+            $specData = null;
+        }
+
         $needAudit = intval($config['need_audit'] ?? 1);
         $initialStatus = $needAudit ? 0 : 1;
 
-        $payType = json_decode($product['pay_type'] ?? '{}', true);
-        $billingCycle = '';
-        if ($payType && isset($payType['pay_type'])) {
-            $billingCycle = $payType['pay_type'];
-        }
+        $billingCycle = $host['billingcycle'] ?? '';
 
         $listingData = [
             'uid'             => $uid,
@@ -346,10 +371,7 @@ class MarketApiController
             'title'           => $title,
             'description'     => $description,
             'sale_price'      => $salePrice,
-            'host_domain'     => $host['domain'] ?? '',
-            'host_os'         => $host['os'] ?? '',
-            'host_ip'         => $host['dedicatedip'] ?? '',
-            'host_port'       => intval($host['port'] ?? 0),
+            'spec_data'       => $specData ? json_encode($specData, JSON_UNESCAPED_UNICODE) : '',
             'product_name'    => $product['name'] ?? '',
             'product_type'    => $product['type'] ?? '',
             'billing_cycle'   => $billingCycle,
@@ -362,6 +384,16 @@ class MarketApiController
         ];
 
         $id = \think\Db::name('market_listing')->insertGetId($listingData);
+
+        if ($initialStatus == 1) {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $uid) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($hostId, $escrowUid);
+                } catch (\Exception $e) {
+                }
+            }
+        }
 
         $msg = $needAudit ? '发布成功，等待管理员审核' : '发布成功';
         return json(['status' => 200, 'data' => ['id' => $id], 'msg' => $msg]);
@@ -397,6 +429,18 @@ class MarketApiController
         if ($salePrice >= 0) {
             $update['sale_price'] = $salePrice;
         }
+        $specData = input('spec_data', '', null);
+        if ($specData !== '') {
+            if (is_string($specData)) {
+                $decoded = json_decode($specData, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $specData = $decoded;
+                }
+            }
+            if (is_array($specData)) {
+                $update['spec_data'] = json_encode($specData, JSON_UNESCAPED_UNICODE);
+            }
+        }
 
         if (empty($update)) {
             return json(['status' => 400, 'msg' => '没有需要修改的内容']);
@@ -430,6 +474,16 @@ class MarketApiController
             'update_time' => time(),
         ]);
 
+        if (in_array($listing['status'], [0, 1])) {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $uid) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($listing['host_id'], $uid);
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
         return json(['status' => 200, 'msg' => '下架成功']);
     }
 
@@ -440,11 +494,20 @@ class MarketApiController
         $config = $this->getConfig();
         $blacklist = array_filter(array_map('intval', explode(',', $config['product_blacklist'] ?? '')));
 
+        $escrowHostIds = \think\Db::name('market_listing')
+            ->where('uid', $uid)
+            ->whereIn('status', [0, 1, 3, 4])
+            ->column('host_id');
+
         $hosts = \think\Db::name('host')->alias('h')
-            ->field('h.id,h.productid,h.domain,h.dedicatedip,h.port,h.os,h.regdate,h.nextduedate,h.domainstatus,p.name as product_name,p.type as product_type')
+            ->field('h.id,h.productid,h.regdate,h.nextduedate,h.billingcycle,h.domainstatus,p.name as product_name,p.type as product_type')
             ->leftJoin('products p', 'h.productid = p.id')
-            ->where('h.uid', $uid)
-            ->where('h.domainstatus', 'Active')
+            ->where(function ($query) use ($uid, $escrowHostIds) {
+                $query->where('h.uid', $uid)->where('h.domainstatus', 'Active');
+                if ($escrowHostIds) {
+                    $query->whereOr('h.id', 'in', $escrowHostIds);
+                }
+            })
             ->select()->toArray();
 
         if ($blacklist) {
@@ -464,14 +527,14 @@ class MarketApiController
                 ->where('type', 'product')
                 ->where('relid', $h['productid'])
                 ->find();
-            $h['original_amount'] = 0;
-            if ($price && floatval($price['monthly'] ?? 0) > 0) {
-                $h['original_amount'] = floatval($price['monthly']);
-            } elseif ($price) {
-                $h['original_amount'] = floatval($price['onetime'] ?? 0);
-            }
+            $h['original_amount'] = \addons\market\model\MarketModel::getPriceFromPricing(
+                $h['billingcycle'] ?? '', $price
+            );
 
-            if ($h['nextduedate'] > time()) {
+            $billingCycle = strtolower($h['billingcycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $h['remaining_days'] = null;
+            } elseif ($h['nextduedate'] > time()) {
                 $h['remaining_days'] = ceil(($h['nextduedate'] - time()) / 86400);
             } else {
                 $h['remaining_days'] = 0;
@@ -493,7 +556,14 @@ class MarketApiController
             ->where('uid', $uid)->where('status', '<>', 4)
             ->order('id', 'desc')->page($page, $size)->select()->toArray();
 
-        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list]]);
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
+        foreach ($list as &$v) {
+            $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+        }
+
+        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
     }
 
     public function myOrders()
@@ -578,6 +648,26 @@ class MarketApiController
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])
             ->order('f.id', 'desc')->page($page, $size)->select()->toArray();
 
-        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list]]);
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
+        foreach ($list as &$v) {
+            $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+        }
+
+        return json(['status' => 200, 'data' => ['total' => $total, 'list' => $list, 'spec_labels' => $specLabels]]);
+    }
+
+    public function fields()
+    {
+        $fields = \think\Db::name('market_config_field')
+            ->order('sort_order', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+        foreach ($fields as &$f) {
+            $f['field_options'] = $f['field_options'] ? json_decode($f['field_options'], true) : null;
+        }
+        return json(['status' => 200, 'data' => $fields]);
     }
 }

@@ -11,12 +11,7 @@ class AdminIndexController extends PluginAdminBaseController
     public function initialize()
     {
         parent::initialize();
-        if (file_exists(dirname(__DIR__) . '/config/config.php')) {
-            $con = require dirname(__DIR__) . '/config/config.php';
-        } else {
-            $con = [];
-        }
-        $this->_config = array_merge($con, $this->getPlugin()->getConfig());
+        $this->_config = \addons\market\model\MarketModel::marketConfig();
 
         $lang = request()->languagesys;
         if (empty($lang)) {
@@ -56,6 +51,14 @@ class AdminIndexController extends PluginAdminBaseController
         }
         $this->assign('Title', $title);
         $this->assign('config', $this->_config);
+
+        $fields = \think\Db::name('market_config_field')
+            ->order('sort_order', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+        $this->assign('fields', $fields);
+
         return $this->fetch('/config');
     }
 
@@ -86,7 +89,7 @@ class AdminIndexController extends PluginAdminBaseController
             $where[] = ['status', '=', $status];
         }
         if ($keyword !== '') {
-            $where[] = ['title', 'like', "%{$keyword}%"];
+            $where[] = ['product_name', 'like', "%{$keyword}%"];
         }
 
         $total = \think\Db::name('market_listing')->where($where)->count();
@@ -105,10 +108,23 @@ class AdminIndexController extends PluginAdminBaseController
             3 => lang('market_status_3'),
         ];
 
+        $specLabels = \think\Db::name('market_config_field')
+            ->column('field_label', 'field_name');
+
         foreach ($list as &$v) {
             $v['status_text'] = $statusMap[$v['status']] ?? '';
             $v['seller'] = \think\Db::name('clients')
                 ->where('id', $v['uid'])->value('username');
+            $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['nextduedate_text'] = '一次性';
+            } elseif ($v['nextduedate'] > 0) {
+                $v['nextduedate_text'] = date('Y/m/d', $v['nextduedate']);
+            } else {
+                $v['nextduedate_text'] = '';
+            }
         }
 
         return json([
@@ -118,6 +134,7 @@ class AdminIndexController extends PluginAdminBaseController
                 'page'  => $page,
                 'limit' => $limit,
                 'list'  => $list,
+                'spec_labels' => $specLabels,
             ],
         ]);
     }
@@ -191,6 +208,13 @@ class AdminIndexController extends PluginAdminBaseController
         ]);
 
         if ($act === 'pass') {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $listing['uid']) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($listing['host_id'], $escrowUid);
+                } catch (\Exception $e) {
+                }
+            }
             return json(['status' => 200, 'msg' => lang('market_audit_pass')]);
         }
         return json(['status' => 200, 'msg' => lang('market_audit_reject')]);
@@ -236,12 +260,107 @@ class AdminIndexController extends PluginAdminBaseController
             return json(['status' => 400, 'msg' => '已售出的商品不能删除']);
         }
 
+        if (in_array($listing['status'], [0, 1])) {
+            $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+            if ($escrowUid > 0 && $escrowUid != $listing['uid']) {
+                try {
+                    \addons\market\model\MarketModel::transferHost($listing['host_id'], $listing['uid']);
+                } catch (\Exception $e) {
+                }
+            }
+        }
+
         \think\Db::name('market_listing')->where('id', $id)->update([
             'status'      => 4,
             'update_time' => time(),
         ]);
 
         return json(['status' => 200, 'msg' => lang('market_deleted')]);
+    }
+
+    public function updateSpec()
+    {
+        $id = intval(input('id'));
+
+        if ($id <= 0) {
+            return json(['status' => 400, 'msg' => '参数错误']);
+        }
+
+        $listing = \think\Db::name('market_listing')->where('id', $id)->find();
+        if (!$listing) {
+            return json(['status' => 400, 'msg' => '商品不存在']);
+        }
+
+        $specData = input('spec_data', '', null);
+        if ($specData !== '') {
+            if (is_string($specData)) {
+                $decoded = json_decode($specData, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $specData = $decoded;
+                }
+            }
+            if (is_array($specData)) {
+                $allFields = \think\Db::name('market_config_field')
+                    ->select()
+                    ->toArray();
+                $requiredFields = [];
+                $numberFields = [];
+                foreach ($allFields as $f) {
+                    if ($f['is_required'] == 1) {
+                        $requiredFields[$f['field_name']] = $f['field_label'];
+                    }
+                    if ($f['field_type'] == 'number') {
+                        $numberFields[] = $f['field_name'];
+                    }
+                }
+                foreach ($requiredFields as $fieldName => $fieldLabel) {
+                    $val = $specData[$fieldName] ?? null;
+                    if ($val === null || $val === '' || (is_array($val) && count($val) === 0)) {
+                        return json(['status' => 400, 'msg' => '请填写必填项：' . $fieldLabel]);
+                    }
+                }
+                foreach ($numberFields as $fieldName) {
+                    $val = $specData[$fieldName] ?? null;
+                    if ($val !== null && $val !== '' && !is_numeric($val)) {
+                        $fieldLabel = $requiredFields[$fieldName] ?? $fieldName;
+                        return json(['status' => 400, 'msg' => $fieldLabel . ' 必须为数字']);
+                    }
+                }
+                $specData = json_encode($specData, JSON_UNESCAPED_UNICODE);
+            }
+        } else {
+            $specData = '';
+        }
+
+        \think\Db::name('market_listing')->where('id', $id)->update([
+            'spec_data'   => $specData,
+            'update_time' => time(),
+        ]);
+
+        return json(['status' => 200, 'msg' => '配置信息已更新']);
+    }
+
+    public function updateNotes()
+    {
+        $id = intval(input('id'));
+
+        if ($id <= 0) {
+            return json(['status' => 400, 'msg' => '参数错误']);
+        }
+
+        $listing = \think\Db::name('market_listing')->where('id', $id)->find();
+        if (!$listing) {
+            return json(['status' => 400, 'msg' => '商品不存在']);
+        }
+
+        $notes = input('notes', '');
+
+        \think\Db::name('market_listing')->where('id', $id)->update([
+            'notes'       => $notes,
+            'update_time' => time(),
+        ]);
+
+        return json(['status' => 200, 'msg' => '备注已更新']);
     }
 
     public function configPost()
@@ -254,13 +373,84 @@ class AdminIndexController extends PluginAdminBaseController
         foreach ($configDef as $key => $def) {
             $saveConfig[$key] = $post[$key] ?? $def['default'] ?? '';
         }
-        $saveJson = json_encode($saveConfig, JSON_UNESCAPED_UNICODE);
 
-        \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->update(['config' => $saveJson]);
+        \addons\market\model\MarketModel::saveMarketConfig($saveConfig);
 
         return json(['status' => 200, 'msg' => lang('market_config_saved')]);
+    }
+
+    public function getFields()
+    {
+        $fields = \think\Db::name('market_config_field')
+            ->order('sort_order', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+        foreach ($fields as &$f) {
+            if ($f['field_options']) {
+                $f['field_options'] = json_decode($f['field_options'], true);
+            }
+        }
+        return json(['status' => 200, 'data' => $fields]);
+    }
+
+    public function saveField()
+    {
+        $id = intval(input('id', 0));
+        $fieldName = input('field_name', '');
+        $fieldLabel = input('field_label', '');
+        $fieldType = input('field_type', 'input');
+        $sortOrder = intval(input('sort_order', 0));
+        $isRequired = intval(input('is_required', 0));
+
+        if ($fieldName === '' || $fieldLabel === '') {
+            return json(['status' => 400, 'msg' => '字段标识和显示名不能为空']);
+        }
+        if (!in_array($fieldType, ['input', 'number', 'dropdown', 'radio', 'checkbox'])) {
+            return json(['status' => 400, 'msg' => '无效的字段类型']);
+        }
+        if (!preg_match('/^[a-z][a-z0-9_]*$/', $fieldName)) {
+            return json(['status' => 400, 'msg' => '字段标识只能是小写字母、数字和下划线，且以字母开头']);
+        }
+
+        $optionsRaw = input('field_options', '');
+        $fieldOptions = '';
+        if (in_array($fieldType, ['dropdown', 'radio', 'checkbox']) && $optionsRaw !== '') {
+            $lines = explode("\n", str_replace("\r\n", "\n", $optionsRaw));
+            $lines = array_map('trim', $lines);
+            $lines = array_filter($lines);
+            $fieldOptions = json_encode(array_values($lines), JSON_UNESCAPED_UNICODE);
+        }
+
+        $now = time();
+        $data = [
+            'field_name'    => $fieldName,
+            'field_label'   => $fieldLabel,
+            'field_type'    => $fieldType,
+            'field_options' => $fieldOptions,
+            'sort_order'    => $sortOrder,
+            'is_required'   => $isRequired,
+            'update_time'   => $now,
+        ];
+
+        if ($id > 0) {
+            \think\Db::name('market_config_field')->where('id', $id)->update($data);
+        } else {
+            $data['create_time'] = $now;
+            \think\Db::name('market_config_field')->insert($data);
+        }
+
+        return json(['status' => 200, 'msg' => '保存成功']);
+    }
+
+    public function deleteField()
+    {
+        $id = intval(input('id', 0));
+        if ($id <= 0) {
+            return json(['status' => 400, 'msg' => '参数错误']);
+        }
+        \think\Db::name('market_config_field')->where('id', $id)->delete();
+        return json(['status' => 200, 'msg' => '删除成功']);
     }
 
     public function manualPublish()
@@ -274,6 +464,19 @@ class AdminIndexController extends PluginAdminBaseController
         }
         $this->assign('Title', $title);
         $this->assign('config', $this->_config);
+
+        $fields = \think\Db::name('market_config_field')
+            ->order('sort_order', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+        foreach ($fields as &$f) {
+            if ($f['field_options']) {
+                $f['field_options'] = json_decode($f['field_options'], true);
+            }
+        }
+        $this->assign('specFields', $fields);
+
         return $this->fetch('/manual_publish');
     }
 
@@ -293,10 +496,20 @@ class AdminIndexController extends PluginAdminBaseController
         $config = $this->_config;
         $blacklist = array_filter(array_map('intval', explode(',', $config['product_blacklist'] ?? '')));
 
+        $escrowHostIds = \think\Db::name('market_listing')
+            ->where('uid', $uid)
+            ->whereIn('status', [0, 1, 3, 4])
+            ->column('host_id');
+
         $hosts = \think\Db::name('host')->alias('h')
-            ->field('h.id,h.domain,h.dedicatedip,h.os,h.port,h.domainstatus,h.productid,h.regdate,h.nextduedate,p.name as product_name,p.type as product_type,p.pay_type')
+            ->field('h.id,h.domain,h.dedicatedip,h.os,h.port,h.domainstatus,h.productid,h.regdate,h.nextduedate,h.billingcycle,p.name as product_name,p.type as product_type')
             ->leftJoin('products p', 'h.productid = p.id')
-            ->where('h.uid', $uid)
+            ->where(function ($query) use ($uid, $escrowHostIds) {
+                $query->where('h.uid', $uid);
+                if ($escrowHostIds) {
+                    $query->whereOr('h.id', 'in', $escrowHostIds);
+                }
+            })
             ->select()
             ->toArray();
 
@@ -326,15 +539,11 @@ class AdminIndexController extends PluginAdminBaseController
                 ->where('type', 'product')
                 ->where('relid', $host['productid'])
                 ->find();
-            $host['original_amount'] = 0;
-            if ($price && floatval($price['monthly'] ?? 0) > 0) {
-                $host['original_amount'] = floatval($price['monthly']);
-            } elseif ($price) {
-                $host['original_amount'] = floatval($price['onetime'] ?? 0);
-            }
+            $host['original_amount'] = \addons\market\model\MarketModel::getPriceFromPricing(
+                $host['billingcycle'] ?? '', $price
+            );
 
-            $payTypes = json_decode($host['pay_type'] ?? '{}', true);
-            $host['billing_cycle'] = $payTypes['pay_type'] ?? '';
+            $host['billing_cycle'] = $host['billingcycle'] ?? '';
         }
 
         return json([
@@ -383,24 +592,31 @@ class AdminIndexController extends PluginAdminBaseController
         }
 
         $product = \think\Db::name('products')
-            ->field('name,type,pay_type')
+            ->field('name,type')
             ->where('id', $host['productid'])->find();
 
         $price = \think\Db::name('pricing')
             ->where('type', 'product')
             ->where('relid', $host['productid'])
             ->find();
-        $originalAmount = 0;
-        if ($price && floatval($price['monthly'] ?? 0) > 0) {
-            $originalAmount = floatval($price['monthly']);
-        } elseif ($price) {
-            $originalAmount = floatval($price['onetime'] ?? 0);
-        }
+        $originalAmount = \addons\market\model\MarketModel::getPriceFromPricing(
+            $host['billingcycle'] ?? '', $price
+        );
 
-        $payType = json_decode($product['pay_type'] ?? '{}', true);
-        $billingCycle = $payType['pay_type'] ?? '';
+        $billingCycle = $host['billingcycle'] ?? '';
 
         $title = $product['name'] ?? '未命名服务器';
+
+        $specData = input('spec_data', '', null);
+        if ($specData !== '' && is_string($specData)) {
+            $decoded = json_decode($specData, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $specData = $decoded;
+            }
+        } elseif (is_array($specData)) {
+        } else {
+            $specData = null;
+        }
 
         $listingData = [
             'uid'             => $uid,
@@ -409,10 +625,7 @@ class AdminIndexController extends PluginAdminBaseController
             'title'           => $title,
             'description'     => $desc,
             'sale_price'      => $salePrice,
-            'host_domain'     => $host['domain'] ?? '',
-            'host_os'         => $host['os'] ?? '',
-            'host_ip'         => $host['dedicatedip'] ?? '',
-            'host_port'       => intval($host['port'] ?? 0),
+            'spec_data'       => $specData ? json_encode($specData, JSON_UNESCAPED_UNICODE) : '',
             'product_name'    => $product['name'] ?? '',
             'product_type'    => $product['type'] ?? '',
             'billing_cycle'   => $billingCycle,
@@ -425,6 +638,14 @@ class AdminIndexController extends PluginAdminBaseController
         ];
 
         $id = \think\Db::name('market_listing')->insertGetId($listingData);
+
+        $escrowUid = \addons\market\model\MarketModel::getEscrowUid();
+        if ($escrowUid > 0 && $escrowUid != $uid) {
+            try {
+                \addons\market\model\MarketModel::transferHost($hostId, $escrowUid);
+            } catch (\Exception $e) {
+            }
+        }
 
         return json(['status' => 200, 'data' => ['id' => $id], 'msg' => '上架成功']);
     }
