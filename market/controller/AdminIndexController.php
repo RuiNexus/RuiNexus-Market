@@ -283,7 +283,7 @@ class AdminIndexController extends PluginAdminBaseController
             return json(['status' => 400, 'msg' => '商品不存在']);
         }
 
-        $specData = input('spec_data', '');
+        $specData = input('spec_data', '', null);
         if ($specData !== '') {
             if (is_string($specData)) {
                 $decoded = json_decode($specData, true);
@@ -581,7 +581,7 @@ class AdminIndexController extends PluginAdminBaseController
 
         $title = $product['name'] ?? '未命名服务器';
 
-        $specData = input('spec_data', '');
+        $specData = input('spec_data', '', null);
         if ($specData !== '' && is_string($specData)) {
             $decoded = json_decode($specData, true);
             if (json_last_error() === JSON_ERROR_NONE) {
