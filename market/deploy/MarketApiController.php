@@ -11,26 +11,7 @@ class MarketApiController
 
     private function getUid()
     {
-        $uid = $this->verifyJwtToken();
-        if ($uid) {
-            return $uid;
-        }
-
-        $uid = cmf_get_current_user_id();
-        if ($uid) {
-            return $uid;
-        }
-
-        $uid = session('user.id');
-        if ($uid) {
-            return $uid;
-        }
-
-        $token = input('token', '');
-        if ($token) {
-            $uid = \think\Db::name('clients')->where('token', $token)->value('id');
-        }
-        return intval($uid);
+        return $this->verifyJwtToken();
     }
 
     private function verifyJwtToken()
