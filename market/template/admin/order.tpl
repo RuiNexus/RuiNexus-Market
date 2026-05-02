@@ -46,10 +46,11 @@
                     <th class="center">支付方式</th>
                     <th class="center">状态</th>
                     <th class="center">创建时间</th>
+                    <th class="center">操作</th>
                   </tr>
                 </thead>
                 <tbody id="orderTbody">
-                  <tr><td colspan="9" class="text-center">加载中...</td></tr>
+                  <tr><td colspan="10" class="text-center">加载中...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -84,7 +85,7 @@ function loadOrders(page) {
       var data = res.data;
       var html = '';
       if (data.list.length == 0) {
-        html = '<tr><td colspan="9" class="text-center">暂无数据</td></tr>';
+        html = '<tr><td colspan="10" class="text-center">暂无数据</td></tr>';
       }
       $.each(data.list, function (i, v) {
         var statusBadge = '';
@@ -106,6 +107,11 @@ function loadOrders(page) {
         html += '<td class="center">' + v.pay_type_text + '</td>';
         html += '<td class="center">' + statusBadge + '</td>';
         html += '<td class="center">' + (v.create_time ? new Date(v.create_time * 1000).toLocaleString() : '') + '</td>';
+        html += '<td class="center">';
+        if (v.status == '0') {
+          html += '<button class="btn btn-danger btn-xs" onclick="cancelOrder(' + v.id + ')">取消</button>';
+        }
+        html += '</td>';
         html += '</tr>';
       });
       $('#orderTbody').html(html);
@@ -130,6 +136,33 @@ function renderPagination(total, page, limit) {
   html += '<li class="page-item ' + (page >= totalPages ? 'disabled' : '') + '"><a class="page-link" href="javascript:;" onclick="loadOrders(' + (page + 1) + ')">下一页</a></li>';
   html += '</ul>';
   $('#paginationNav').html(html);
+}
+
+function cancelOrder(orderId) {
+  layer.confirm('确认取消该订单？取消后商品将自动解锁。', {
+    btn: ['确认取消', '再想想'],
+    title: '取消订单',
+    skin: 'layui-layer-lan'
+  }, function (index) {
+    layer.close(index);
+    $.ajax({
+      type: 'POST',
+      url: '{:shd_addon_url("market://AdminIndex/cancelOrder")}',
+      data: { order_id: orderId },
+      dataType: 'json',
+      success: function (res) {
+        if (res.status == 200) {
+          layer.msg(res.msg, { icon: 1 });
+          loadOrders(currentPage);
+        } else {
+          layer.msg(res.msg, { icon: 2 });
+        }
+      },
+      error: function () {
+        layer.msg('操作失败，请重试', { icon: 2 });
+      }
+    });
+  });
 }
 
 $(function () {

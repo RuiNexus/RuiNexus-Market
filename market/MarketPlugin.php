@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.10.3',
+        'version'     => '1.11.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',

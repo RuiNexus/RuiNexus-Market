@@ -244,6 +244,44 @@ class AdminIndexController extends PluginAdminBaseController
         return json(['status' => 200, 'msg' => $msg, 'is_featured' => $newFeatured]);
     }
 
+    public function cancelOrder()
+    {
+        $orderId = intval(input('order_id'));
+
+        if ($orderId <= 0) {
+            return json(['status' => 400, 'msg' => '参数错误']);
+        }
+
+        $order = \think\Db::name('market_order')->where('id', $orderId)->find();
+        if (!$order) {
+            return json(['status' => 400, 'msg' => '订单不存在']);
+        }
+        if ($order['status'] != 0) {
+            return json(['status' => 400, 'msg' => '只能取消待付款的订单']);
+        }
+
+        if ($order['invoice_id'] > 0) {
+            $invoice = \think\Db::name('invoices')
+                ->where('id', $order['invoice_id'])
+                ->where('delete_time', 0)
+                ->find();
+            if ($invoice) {
+                \think\Db::name('invoices')
+                    ->where('id', $order['invoice_id'])
+                    ->update(['status' => 'Cancelled', 'update_time' => time()]);
+                hook('invoice_mark_cancelled', ['invoiceid' => $order['invoice_id']]);
+            }
+        } else {
+            \think\Db::name('market_order')->where('id', $orderId)->update([
+                'status' => 4,
+                'remark' => '管理员取消',
+            ]);
+            \addons\market\model\MarketModel::unlockListing($order['listing_id']);
+        }
+
+        return json(['status' => 200, 'msg' => '订单已取消']);
+    }
+
     public function delete()
     {
         $id = intval(input('id'));
