@@ -103,7 +103,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount')
+            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount,a.notes')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
@@ -163,6 +163,8 @@ class MarketApiController
         if (!$listing || $listing['status'] != 1) {
             return json(['status' => 404, 'msg' => '商品不存在或已下架']);
         }
+
+        unset($listing['host_domain'], $listing['host_os'], $listing['host_ip'], $listing['host_port']);
 
         \think\Db::name('market_listing')->where('id', $id)->setInc('views', 1);
 
@@ -553,6 +555,7 @@ class MarketApiController
         $total = \think\Db::name('market_listing')
             ->where('uid', $uid)->where('status', '<>', 4)->count();
         $list  = \think\Db::name('market_listing')
+            ->field('id,uid,host_id,product_id,title,description,sale_price,spec_data,product_name,product_type,billing_cycle,nextduedate,regdate,original_amount,status,is_featured,sort_order,views,notes,create_time,update_time')
             ->where('uid', $uid)->where('status', '<>', 4)
             ->order('id', 'desc')->page($page, $size)->select()->toArray();
 
@@ -643,7 +646,7 @@ class MarketApiController
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])->count();
 
         $list  = \think\Db::name('market_favorite')->alias('f')
-            ->field('l.*,f.create_time as fav_time')
+            ->field('l.id,l.uid,l.host_id,l.product_id,l.title,l.description,l.sale_price,l.spec_data,l.product_name,l.product_type,l.billing_cycle,l.nextduedate,l.regdate,l.original_amount,l.status,l.is_featured,l.sort_order,l.views,l.notes,l.create_time,l.update_time,f.create_time as fav_time')
             ->leftJoin('market_listing l', 'f.listing_id = l.id')
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])
             ->order('f.id', 'desc')->page($page, $size)->select()->toArray();
