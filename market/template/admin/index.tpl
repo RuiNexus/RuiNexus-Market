@@ -350,6 +350,20 @@ $('#saveSpecBtn').on('click', function () {
     }
   });
 
+  if (specFieldsCache) {
+    for (var i = 0; i < specFieldsCache.length; i++) {
+      var f = specFieldsCache[i];
+      if (f.is_required != 1) continue;
+      var val = specData[f.field_name];
+      var isEmpty = (val === undefined || val === null || val === '');
+      if (Array.isArray(val) && val.length === 0) isEmpty = true;
+      if (isEmpty) {
+        layer.msg('请填写必填项：' + f.field_label, {icon: 5});
+        return;
+      }
+    }
+  }
+
   var btn = $(this);
   btn.prop('disabled', true).text('保存中...');
   $.ajax({

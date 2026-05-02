@@ -292,6 +292,15 @@ class AdminIndexController extends PluginAdminBaseController
                 }
             }
             if (is_array($specData)) {
+                $requiredFields = \think\Db::name('market_config_field')
+                    ->where('is_required', 1)
+                    ->column('field_label', 'field_name');
+                foreach ($requiredFields as $fieldName => $fieldLabel) {
+                    $val = $specData[$fieldName] ?? null;
+                    if ($val === null || $val === '' || (is_array($val) && count($val) === 0)) {
+                        return json(['status' => 400, 'msg' => '请填写必填项：' . $fieldLabel]);
+                    }
+                }
                 $specData = json_encode($specData, JSON_UNESCAPED_UNICODE);
             }
         } else {
