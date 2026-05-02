@@ -495,7 +495,7 @@ class MarketApiController
 
         $escrowHostIds = \think\Db::name('market_listing')
             ->where('uid', $uid)
-            ->whereIn('status', [0, 1])
+            ->whereIn('status', [0, 1, 3, 4])
             ->column('host_id');
 
         $hosts = \think\Db::name('host')->alias('h')
