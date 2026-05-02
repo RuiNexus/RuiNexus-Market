@@ -287,6 +287,8 @@ function editSpec(id) {
         html += '</label>';
         if (f.field_type == 'input') {
           html += '<input type="text" class="form-control spec-field" data-name="' + f.field_name + '" value="' + (typeof val === 'string' ? val.replace(/"/g, '&quot;') : val) + '">';
+        } else if (f.field_type == 'number') {
+          html += '<input type="number" class="form-control spec-field" data-name="' + f.field_name + '" value="' + val + '" min="0" step="any">';
         } else if (f.field_type == 'dropdown') {
           html += '<select class="form-control spec-field" data-name="' + f.field_name + '">';
           html += '<option value="">-- 请选择 --</option>';
@@ -353,13 +355,21 @@ $('#saveSpecBtn').on('click', function () {
   if (specFieldsCache) {
     for (var i = 0; i < specFieldsCache.length; i++) {
       var f = specFieldsCache[i];
-      if (f.is_required != 1) continue;
-      var val = specData[f.field_name];
-      var isEmpty = (val === undefined || val === null || val === '');
-      if (Array.isArray(val) && val.length === 0) isEmpty = true;
-      if (isEmpty) {
-        layer.msg('请填写必填项：' + f.field_label, {icon: 5});
-        return;
+      if (f.is_required == 1) {
+        var val = specData[f.field_name];
+        var isEmpty = (val === undefined || val === null || val === '');
+        if (Array.isArray(val) && val.length === 0) isEmpty = true;
+        if (isEmpty) {
+          layer.msg('请填写必填项：' + f.field_label, {icon: 5});
+          return;
+        }
+      }
+      if (f.field_type == 'number') {
+        var val = specData[f.field_name];
+        if (val !== undefined && val !== null && val !== '' && isNaN(parseFloat(val))) {
+          layer.msg(f.field_label + ' 必须为数字', {icon: 5});
+          return;
+        }
       }
     }
   }

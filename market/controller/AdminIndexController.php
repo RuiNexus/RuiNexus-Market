@@ -300,13 +300,30 @@ class AdminIndexController extends PluginAdminBaseController
                 }
             }
             if (is_array($specData)) {
-                $requiredFields = \think\Db::name('market_config_field')
-                    ->where('is_required', 1)
-                    ->column('field_label', 'field_name');
+                $allFields = \think\Db::name('market_config_field')
+                    ->select()
+                    ->toArray();
+                $requiredFields = [];
+                $numberFields = [];
+                foreach ($allFields as $f) {
+                    if ($f['is_required'] == 1) {
+                        $requiredFields[$f['field_name']] = $f['field_label'];
+                    }
+                    if ($f['field_type'] == 'number') {
+                        $numberFields[] = $f['field_name'];
+                    }
+                }
                 foreach ($requiredFields as $fieldName => $fieldLabel) {
                     $val = $specData[$fieldName] ?? null;
                     if ($val === null || $val === '' || (is_array($val) && count($val) === 0)) {
                         return json(['status' => 400, 'msg' => '请填写必填项：' . $fieldLabel]);
+                    }
+                }
+                foreach ($numberFields as $fieldName) {
+                    $val = $specData[$fieldName] ?? null;
+                    if ($val !== null && $val !== '' && !is_numeric($val)) {
+                        $fieldLabel = $requiredFields[$fieldName] ?? $fieldName;
+                        return json(['status' => 400, 'msg' => $fieldLabel . ' 必须为数字']);
                     }
                 }
                 $specData = json_encode($specData, JSON_UNESCAPED_UNICODE);
@@ -388,6 +405,9 @@ class AdminIndexController extends PluginAdminBaseController
 
         if ($fieldName === '' || $fieldLabel === '') {
             return json(['status' => 400, 'msg' => '字段标识和显示名不能为空']);
+        }
+        if (!in_array($fieldType, ['input', 'number', 'dropdown', 'radio', 'checkbox'])) {
+            return json(['status' => 400, 'msg' => '无效的字段类型']);
         }
         if (!preg_match('/^[a-z][a-z0-9_]*$/', $fieldName)) {
             return json(['status' => 400, 'msg' => '字段标识只能是小写字母、数字和下划线，且以字母开头']);

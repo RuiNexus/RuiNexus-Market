@@ -63,6 +63,7 @@
 <script src="https://cdn.bootcdn.net/ajax/libs/layer/3.5.1/layer.js"></script>
 <script type="text/javascript">
 var currentUid = 0;
+var specFields = {$specFields|json_encode};
 
 $('#searchUserBtn').on('click', function () {
   var uid = parseInt($('#uidInput').val());
@@ -139,7 +140,7 @@ function loadHosts(uid) {
           return;
         }
 
-        doPublish(currentUid, hostId, price, $(this));
+        showPublishDialog(currentUid, hostId, price, $(this));
       });
     },
     error: function () {
@@ -149,30 +150,126 @@ function loadHosts(uid) {
   });
 }
 
-function doPublish(uid, hostId, price, btn) {
-  layer.confirm('确认将主机 #' + hostId + ' 以 ¥' + price + ' 直接上架吗？', {
-    btn: ['确认上架', '取消']
-  }, function () {
-    btn.prop('disabled', true).text('处理中...');
-    $.ajax({
-      type: 'POST',
-      url: '{:shd_addon_url("market://AdminIndex/doManualPublish")}',
-      data: { uid: uid, host_id: hostId, sale_price: price },
-      dataType: 'json',
-      success: function (res) {
-        if (res.status == 200) {
-          layer.msg(res.msg, {icon: 1, time: 1500});
-          setTimeout(function () { loadHosts(currentUid); }, 1500);
-        } else {
-          layer.msg(res.msg, {icon: 5});
-          btn.prop('disabled', false).text('上架');
-        }
-      },
-      error: function () {
-        layer.msg('请求失败', {icon: 5});
+function buildSpecFieldsHtml(data) {
+  if (!data || data.length == 0) return '';
+  var html = '<div class="spec-fields" style="margin-top:10px;">';
+  html += '<label style="font-weight:bold;margin-bottom:8px;display:block;">实例配置</label>';
+  $.each(data, function (i, f) {
+    html += '<div class="form-group" style="margin-bottom:10px;">';
+    html += '<label style="display:block;margin-bottom:3px;font-size:13px;">' + f.field_label + (f.is_required == '1' ? ' <span style="color:red;">*</span>' : '') + '</label>';
+
+    if (f.field_type == 'input') {
+      html += '<input type="text" class="form-control spec-input" data-name="' + f.field_name + '" placeholder="' + f.field_label + '">';
+    } else if (f.field_type == 'number') {
+      html += '<input type="number" class="form-control spec-input" data-name="' + f.field_name + '" placeholder="' + f.field_label + '" min="0" step="any">';
+    } else if (f.field_type == 'dropdown') {
+      html += '<select class="form-control spec-input" data-name="' + f.field_name + '">';
+      html += '<option value="">请选择</option>';
+      if (f.field_options && Array.isArray(f.field_options)) {
+        $.each(f.field_options, function (j, opt) {
+          html += '<option value="' + opt + '">' + opt + '</option>';
+        });
+      }
+      html += '</select>';
+    } else if (f.field_type == 'radio') {
+      if (f.field_options && Array.isArray(f.field_options)) {
+        $.each(f.field_options, function (j, opt) {
+          html += '<label class="radio-inline" style="margin-right:12px;">';
+          html += '<input type="radio" class="spec-input" data-name="' + f.field_name + '" name="spec_' + f.field_name + '" value="' + opt + '"> ' + opt;
+          html += '</label>';
+        });
+      }
+    } else if (f.field_type == 'checkbox') {
+      if (f.field_options && Array.isArray(f.field_options)) {
+        $.each(f.field_options, function (j, opt) {
+          html += '<label class="checkbox-inline" style="margin-right:12px;">';
+          html += '<input type="checkbox" class="spec-input" data-name="' + f.field_name + '" value="' + opt + '"> ' + opt;
+          html += '</label>';
+        });
+      }
+    }
+
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function collectSpecData() {
+  var data = {};
+  $('.spec-input').each(function () {
+    var name = $(this).data('name');
+    if (!name) return;
+    var type = $(this).attr('type');
+    if (type == 'radio') {
+      if ($(this).is(':checked')) {
+        data[name] = $(this).val();
+      }
+    } else if (type == 'checkbox') {
+      if ($(this).is(':checked')) {
+        if (!data[name]) data[name] = [];
+        data[name].push($(this).val());
+      }
+    } else {
+      if ($(this).val() !== '') {
+        data[name] = $(this).val();
+      }
+    }
+  });
+  return data;
+}
+
+function showPublishDialog(uid, hostId, price, btn) {
+  var specHtml = buildSpecFieldsHtml(specFields);
+
+  layer.open({
+    type: 1,
+    title: '上架确认 - 主机 #' + hostId,
+    area: ['500px', 'auto'],
+    shadeClose: true,
+    content: '<div style="padding:20px;">' +
+      '<p>确认将主机 <strong>#' + hostId + '</strong> 以 <strong>¥' + price + '</strong> 直接上架？</p>' +
+      specHtml +
+      '<div style="text-align:right;margin-top:15px;">' +
+      '<button class="btn btn-secondary" onclick="layer.closeAll()" style="margin-right:10px;padding:6px 20px;">取消</button>' +
+      '<button class="btn btn-primary" id="confirmPublishBtn" style="padding:6px 20px;">确认上架</button>' +
+      '</div>' +
+      '</div>',
+    success: function () {
+      $('#confirmPublishBtn').off('click').on('click', function () {
+        var specData = collectSpecData();
+        doPublish(uid, hostId, price, specData, btn);
+      });
+    }
+  });
+}
+
+function doPublish(uid, hostId, price, specData, btn) {
+  btn.prop('disabled', true).text('处理中...');
+  $.ajax({
+    type: 'POST',
+    url: '{:shd_addon_url("market://AdminIndex/doManualPublish")}',
+    data: {
+      uid: uid,
+      host_id: hostId,
+      sale_price: price,
+      spec_data: JSON.stringify(specData)
+    },
+    dataType: 'json',
+    success: function (res) {
+      if (res.status == 200) {
+        layer.closeAll();
+        layer.msg(res.msg, {icon: 1, time: 1500});
+        setTimeout(function () { loadHosts(currentUid); }, 1500);
+      } else {
+        layer.msg(res.msg, {icon: 5});
         btn.prop('disabled', false).text('上架');
       }
-    });
+    },
+    error: function () {
+      layer.msg('请求失败', {icon: 5});
+      btn.prop('disabled', false).text('上架');
+    }
   });
 }
 </script>

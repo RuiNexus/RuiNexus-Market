@@ -128,6 +128,7 @@
                     <td>{$f.field_label}</td>
                     <td class="center">
                       {if $f.field_type == 'input'}文本框
+                      {elseif $f.field_type == 'number'}数字
                       {elseif $f.field_type == 'dropdown'}下拉
                       {elseif $f.field_type == 'radio'}单选
                       {elseif $f.field_type == 'checkbox'}多选
@@ -178,6 +179,7 @@
           <label>字段类型</label>
           <select class="form-control" id="fieldType">
             <option value="input">文本框 (input)</option>
+            <option value="number">数字 (number)</option>
             <option value="dropdown">下拉选择 (dropdown)</option>
             <option value="radio">单选 (radio)</option>
             <option value="checkbox">多选 (checkbox)</option>
