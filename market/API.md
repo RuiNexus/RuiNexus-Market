@@ -1,6 +1,6 @@
 # RuiNexus Market API 接口文档
 
-> 版本: v1.8.0 | 开发者: RuiNexus / YeHuaiJing
+> 版本: v1.9.2 | 开发者: RuiNexus / YeHuaiJing
 
 ---
 
@@ -9,7 +9,6 @@
 ### 前端 API（面向买家/卖家）
 
 - **入口**: `https://www.xxx.com/market_api.php?action={action}`
-    - 登录态通过同域 Cookie 自动传递
 - **请求方式**: GET/POST（取决于接口）
 - **响应格式**: JSON
 - **响应结构**:
@@ -20,16 +19,38 @@
   ```
 - **status 状态码**: `200` 成功 / `400` 参数错误 / `401` 需要登录 / `404` 不存在 / `500` 服务器错误
 
+### 🔒 前端 API 认证方式（v1.9.0+）
+
+所有需要登录的接口均采用 **JWT + Cache 双重验证**，7 层纵深防御：
+
+| 层 | 校验项 | 说明 |
+|----|--------|------|
+| 1 | JWT 格式校验 | 必须为3段 `header.payload.signature` |
+| 2 | Cache 存在检查 | `client_user_login_token_<jwt>` 必须存在 |
+| 3 | JWT 签名解码 | HMAC-SHA256 + `config("jwtkey")`，防伪造 |
+| 4 | Cache uid 匹配 | 缓存中的 uid 必须与 JWT 中一致 |
+| 5 | 密码变更失效 | 改密后旧 JWT 自动作废 |
+| 6 | IP 绑定（可选） | `home_ip_check=1` 时校验签发IP |
+| 7 | 客户端状态检查 | `clients.status=1` 正常才放行 |
+
+**JWT 传递方式**（二选一）：
+- **Cookie**：同域时自动随请求发送（`userSetCookie()` 写入）
+- **Authorization Header**：`Authorization: JWT <token>` 或 `Authorization: Bearer <token>`
+
+> ⚠️ 不再支持 Session 或 `clients.token` 降级认证，必须持有有效 JWT。
+
 ### 后台 API（面向管理员）
 
 - **入口**: 后台管理页面内 AJAX 调用 `shd_addon_url('market://AdminIndex/{method}')`
-- **认证**: `PluginAdminBaseController` 框架级登录验证
+- **认证**: `PluginAdminBaseController` 框架级 Session 登录验证
 
 ---
 
 ## 前端 API（MarketApiController）
 
-### 1. 系统配置 — `GET ?action=config`
+### 1. 系统配置 — `GET ?action=config` 🔓
+
+> 🔓 无需登录
 
 获取站点配置和自定义字段定义。
 
@@ -69,7 +90,9 @@
 
 ---
 
-### 2. 商品列表 — `GET ?action=list`
+### 2. 商品列表 — `GET ?action=list` 🔓
+
+> 🔓 无需登录
 
 **请求参数**:
 
@@ -120,7 +143,9 @@
 
 ---
 
-### 3. 商品详情 — `GET ?action=detail&id={id}`
+### 3. 商品详情 — `GET ?action=detail&id={id}` 🔓
+
+> 🔓 无需登录（登录后额外返回 `is_favorited` 字段）
 
 **请求参数**:
 
@@ -160,7 +185,9 @@
 
 ---
 
-### 4. 购买商品 — `POST ?action=buy`
+### 4. 购买商品 — `POST ?action=buy` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -188,7 +215,9 @@
 
 ---
 
-### 5. 发布商品 — `POST ?action=create`
+### 5. 发布商品 — `POST ?action=create` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -209,7 +238,9 @@
 
 ---
 
-### 6. 修改商品 — `POST ?action=update&id={id}`
+### 6. 修改商品 — `POST ?action=update&id={id}` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -230,7 +261,9 @@
 
 ---
 
-### 7. 下架商品 — `POST ?action=delist&id={id}`
+### 7. 下架商品 — `POST ?action=delist&id={id}` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -249,7 +282,9 @@
 
 ---
 
-### 8. 我的服务器列表 — `GET ?action=my_hosts`
+### 8. 我的服务器列表 — `GET ?action=my_hosts` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 列出当前用户 Active 状态的 host 记录（含黑名单过滤、已在售标记）。
 
@@ -281,7 +316,9 @@
 
 ---
 
-### 9. 我发布的商品 — `GET ?action=my_listings`
+### 9. 我发布的商品 — `GET ?action=my_listings` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -315,7 +352,9 @@
 
 ---
 
-### 10. 我购买的订单 — `GET ?action=my_orders`
+### 10. 我购买的订单 — `GET ?action=my_orders` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -353,7 +392,9 @@
 
 ---
 
-### 11. 我卖出的订单 — `GET ?action=my_sales`
+### 11. 我卖出的订单 — `GET ?action=my_sales` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -388,7 +429,9 @@
 
 ---
 
-### 12. 收藏/取消收藏 — `POST ?action=favorite&id={id}`
+### 12. 收藏/取消收藏 — `POST ?action=favorite&id={id}` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -405,7 +448,9 @@
 
 ---
 
-### 13. 我的收藏列表 — `GET ?action=favorites`
+### 13. 我的收藏列表 — `GET ?action=favorites` 🔒
+
+> 🔒 需要 JWT 鉴权
 
 **请求参数**:
 
@@ -437,7 +482,9 @@
 
 ---
 
-### 14. 自定义字段定义 — `GET ?action=fields`
+### 14. 自定义字段定义 — `GET ?action=fields` 🔓
+
+> 🔓 无需登录
 
 获取管理员配置的自定义字段定义列表。
 
