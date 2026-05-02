@@ -119,6 +119,28 @@ class MarketHooks
         $this->handleInvoiceCancelledOrDeleted($param, '账单删除');
     }
 
+    public function product_divert_delete($param)
+    {
+        $invoiceId = intval($param['id'] ?? 0);
+        if ($invoiceId <= 0) {
+            return;
+        }
+
+        $order = \think\Db::name('market_order')
+            ->where('invoice_id', $invoiceId)
+            ->find();
+        if (!$order || $order['status'] != 0) {
+            return;
+        }
+
+        \think\Db::name('market_order')->where('id', $order['id'])->update([
+            'status' => 4,
+            'remark' => '账单取消，订单自动取消',
+        ]);
+
+        \addons\market\model\MarketModel::unlockListing($order['listing_id']);
+    }
+
     private function handleInvoiceCancelledOrDeleted($param, $reason)
     {
         $invoiceId = intval($param['invoiceid'] ?? 0);

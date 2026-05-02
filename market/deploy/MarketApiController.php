@@ -382,6 +382,19 @@ class MarketApiController
             ];
             \think\Db::name('invoice_items')->insert($itemData);
 
+            $ordersData = [
+                'uid'         => $uid,
+                'status'      => 'Pending',
+                'create_time' => time(),
+                'update_time' => time(),
+                'amount'      => $listing['sale_price'],
+                'payment'     => '',
+                'promo_type'  => '',
+                'invoiceid'   => $invoiceId,
+                'delete_time' => 0,
+            ];
+            \think\Db::name('orders')->insert($ordersData);
+
             \think\Db::name('market_order')->where('id', $orderId)
                 ->update(['invoice_id' => $invoiceId]);
 
