@@ -300,10 +300,20 @@ class AdminIndexController extends PluginAdminBaseController
         $config = $this->_config;
         $blacklist = array_filter(array_map('intval', explode(',', $config['product_blacklist'] ?? '')));
 
+        $escrowHostIds = \think\Db::name('market_listing')
+            ->where('uid', $uid)
+            ->whereIn('status', [0, 1])
+            ->column('host_id');
+
         $hosts = \think\Db::name('host')->alias('h')
             ->field('h.id,h.domain,h.dedicatedip,h.os,h.port,h.domainstatus,h.productid,h.regdate,h.nextduedate,p.name as product_name,p.type as product_type,p.pay_type')
             ->leftJoin('products p', 'h.productid = p.id')
-            ->where('h.uid', $uid)
+            ->where(function ($query) use ($uid, $escrowHostIds) {
+                $query->where('h.uid', $uid);
+                if ($escrowHostIds) {
+                    $query->whereOr('h.id', 'in', $escrowHostIds);
+                }
+            })
             ->select()
             ->toArray();
 

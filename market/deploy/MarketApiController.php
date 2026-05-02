@@ -460,11 +460,20 @@ class MarketApiController
         $config = $this->getConfig();
         $blacklist = array_filter(array_map('intval', explode(',', $config['product_blacklist'] ?? '')));
 
+        $escrowHostIds = \think\Db::name('market_listing')
+            ->where('uid', $uid)
+            ->whereIn('status', [0, 1])
+            ->column('host_id');
+
         $hosts = \think\Db::name('host')->alias('h')
             ->field('h.id,h.productid,h.domain,h.dedicatedip,h.port,h.os,h.regdate,h.nextduedate,h.domainstatus,p.name as product_name,p.type as product_type')
             ->leftJoin('products p', 'h.productid = p.id')
-            ->where('h.uid', $uid)
-            ->where('h.domainstatus', 'Active')
+            ->where(function ($query) use ($uid, $escrowHostIds) {
+                $query->where('h.uid', $uid)->where('h.domainstatus', 'Active');
+                if ($escrowHostIds) {
+                    $query->whereOr('h.id', 'in', $escrowHostIds);
+                }
+            })
             ->select()->toArray();
 
         if ($blacklist) {
