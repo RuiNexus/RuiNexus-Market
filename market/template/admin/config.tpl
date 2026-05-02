@@ -98,38 +98,6 @@
           <hr class="my-4">
 
           <div class="card-title">
-            <h5 class="m-0">JWT 认证校验测试</h5>
-            <small class="text-muted">粘贴浏览器 Cookie 中的 JWT Token，逐层验证认证链路是否正常</small>
-          </div>
-
-          <div class="px-5 mx-auto w-75">
-            <div class="form-group">
-              <label>JWT Token <small class="text-muted">(从浏览器 Cookie 或 Authorization Header 中获取)</small></label>
-              <div class="input-group">
-                <textarea class="form-control" id="jwtTokenInput" rows="3" placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."></textarea>
-                <div class="input-group-append">
-                  <button class="btn btn-info" type="button" id="jwtCheckBtn" style="height:auto;">
-                    <i class="fas fa-check-circle"></i> 校验 JWT
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div id="jwtResult" style="display:none;">
-              <div id="jwtOverall" class="alert mb-2" style="padding:6px 12px;"></div>
-              <div id="jwtSteps" class="table-responsive">
-                <table class="table table-sm table-bordered mb-0">
-                  <thead class="thead-light">
-                    <tr><th style="width:40px;">#</th><th>校验项</th><th style="width:80px;">结果</th><th>详情</th></tr>
-                  </thead>
-                  <tbody id="jwtStepsBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <hr class="my-4">
-
-          <div class="card-title">
             <h5 class="m-0">自定义配置字段</h5>
             <small class="text-muted">卖家在上架时可以自定义填写这些配置信息，如CPU、内存、带宽等</small>
           </div>
@@ -182,6 +150,41 @@
                   {/if}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="card-title">
+            <h5 class="m-0">
+              JWT 认证校验测试
+              <span class="badge badge-warning ml-2" style="font-size:12px;vertical-align:middle;">🧪 开发测试功能</span>
+            </h5>
+            <small class="text-muted">粘贴浏览器 Cookie 中的 JWT Token，逐层验证认证链路是否正常。仅用于开发调试，生产环境可移除。</small>
+          </div>
+
+          <div class="px-5 mx-auto w-75">
+            <div class="form-group">
+              <label>JWT Token <small class="text-muted">(从浏览器 Cookie 或 Authorization Header 中获取)</small></label>
+              <div class="input-group">
+                <textarea class="form-control" id="jwtTokenInput" rows="3" placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."></textarea>
+                <div class="input-group-append">
+                  <button class="btn btn-info" type="button" id="jwtCheckBtn" style="height:auto;">
+                    <i class="fas fa-check-circle"></i> 校验 JWT
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div id="jwtResult" style="display:none;">
+              <div id="jwtOverall" class="alert mb-2" style="padding:6px 12px;"></div>
+              <div id="jwtSteps" class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                  <thead class="thead-light">
+                    <tr><th style="width:40px;">#</th><th>校验项</th><th style="width:80px;">结果</th><th>详情</th></tr>
+                  </thead>
+                  <tbody id="jwtStepsBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
