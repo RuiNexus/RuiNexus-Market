@@ -14,9 +14,9 @@
                 {/if}
               {/foreach}
             </div>
-          </div>
-          <div class="text-center mb-3">
-            <span style="color:#999;font-size:13px;font-style:italic;">君知所向，故无所惧。</span>
+            <div class="col text-right" style="padding-right:15px;">
+              <span style="color:#999;font-size:13px;font-style:italic;">君知所向，故无所惧。</span>
+            </div>
           </div>
           <div class="help-block">
             配置RuiNexus Market二手服务器交易市场的各项参数
