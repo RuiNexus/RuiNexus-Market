@@ -166,7 +166,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount,a.notes')
+            ->field('a.id,a.host_id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount,a.notes')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
@@ -197,8 +197,7 @@ class MarketApiController
         }
 
         foreach ($list as &$v) {
-            $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
-            $host   = $hosts[$hostId] ?? [];
+            $host   = $hosts[$v['host_id']] ?? [];
             $billingCycle = strtolower($v['billing_cycle'] ?? '');
             if (in_array($billingCycle, ['onetime', 'free'])) {
                 $v['remaining_days'] = null;
