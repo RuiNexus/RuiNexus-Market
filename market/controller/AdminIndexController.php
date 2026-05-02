@@ -116,6 +116,15 @@ class AdminIndexController extends PluginAdminBaseController
             $v['seller'] = \think\Db::name('clients')
                 ->where('id', $v['uid'])->value('username');
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
+
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['nextduedate_text'] = '一次性';
+            } elseif ($v['nextduedate'] > 0) {
+                $v['nextduedate_text'] = date('Y/m/d', $v['nextduedate']);
+            } else {
+                $v['nextduedate_text'] = '';
+            }
         }
 
         return json([

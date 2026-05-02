@@ -159,7 +159,7 @@ function loadList(page) {
         html += '<td>' + v.sale_price + '</td>';
         html += '<td>' + (v.product_name || '') + '</td>';
         html += '<td style="font-size:12px;">' + specText + '</td>';
-        html += '<td>' + (v.nextduedate ? new Date(v.nextduedate * 1000).toLocaleDateString() : '') + '</td>';
+        html += '<td>' + (v.nextduedate_text || '') + '</td>';
         html += '<td class="center">' + featuredIcon + ' ' + featuredBtn + '</td>';
         html += '<td class="center">' + statusBadge + '</td>';
         html += '<td style="white-space:nowrap;">' + actions + '</td>';
