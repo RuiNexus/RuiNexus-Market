@@ -11,12 +11,7 @@ class AdminIndexController extends PluginAdminBaseController
     public function initialize()
     {
         parent::initialize();
-        if (file_exists(dirname(__DIR__) . '/config/config.php')) {
-            $con = require dirname(__DIR__) . '/config/config.php';
-        } else {
-            $con = [];
-        }
-        $this->_config = array_merge($con, $this->getPlugin()->getConfig());
+        $this->_config = \addons\market\model\MarketModel::marketConfig();
 
         $lang = request()->languagesys;
         if (empty($lang)) {
@@ -352,11 +347,8 @@ class AdminIndexController extends PluginAdminBaseController
         foreach ($configDef as $key => $def) {
             $saveConfig[$key] = $post[$key] ?? $def['default'] ?? '';
         }
-        $saveJson = json_encode($saveConfig, JSON_UNESCAPED_UNICODE);
 
-        \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->update(['config' => $saveJson]);
+        \addons\market\model\MarketModel::saveMarketConfig($saveConfig);
 
         return json(['status' => 200, 'msg' => lang('market_config_saved')]);
     }

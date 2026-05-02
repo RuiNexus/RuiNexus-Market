@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.6.0',
+        'version'     => '1.7.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',
@@ -28,6 +28,8 @@ class MarketPlugin extends Plugin
         $this->deployApi();
 
         $this->deployEntry();
+
+        $this->migrateConfig();
 
         return true;
     }
@@ -291,6 +293,34 @@ class MarketPlugin extends Plugin
 
     private function dropTables()
     {
+    }
+
+    private function migrateConfig()
+    {
+        $count = \think\Db::name('market_config')->count();
+        if ($count > 0) {
+            return;
+        }
+
+        $oldConfig = \think\Db::name('plugin')
+            ->where('name', 'Market')->where('module', 'addons')
+            ->value('config');
+
+        if (empty($oldConfig) || $oldConfig === 'null') {
+            return;
+        }
+
+        $oldConfig = json_decode($oldConfig, true);
+        if (!is_array($oldConfig) || empty($oldConfig)) {
+            return;
+        }
+
+        foreach ($oldConfig as $key => $value) {
+            \think\Db::name('market_config')->insert([
+                'key'   => $key,
+                'value' => is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE),
+            ]);
+        }
     }
 
     private function deployApi()

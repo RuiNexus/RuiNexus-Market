@@ -35,14 +35,68 @@ class MarketModel extends Model
         return true;
     }
 
+    public static function marketConfig()
+    {
+        $configFile = dirname(__DIR__) . '/config.php';
+        $defaults = [];
+        if (file_exists($configFile)) {
+            $tempArr = (include $configFile);
+            if (!empty($tempArr) && is_array($tempArr)) {
+                foreach ($tempArr as $key => $value) {
+                    if (($value['type'] ?? '') == 'group') {
+                        foreach ($value['options'] as $gvalue) {
+                            foreach ($gvalue['options'] as $ikey => $ivalue) {
+                                $defaults[$ikey] = $ivalue['value'];
+                            }
+                        }
+                    } else {
+                        $defaults[$key] = $value['value'] ?? '';
+                    }
+                }
+            }
+        }
+
+        $keyValues = \think\Db::name('market_config')->column('value', 'key');
+
+        return array_merge($defaults, $keyValues);
+    }
+
+    public static function saveMarketConfig($data)
+    {
+        if (!is_array($data)) {
+            return false;
+        }
+        $now = time();
+        foreach ($data as $key => $value) {
+            $exists = \think\Db::name('market_config')->where('key', $key)->find();
+            if ($exists) {
+                \think\Db::name('market_config')->where('key', $key)->update(['value' => $value]);
+            } else {
+                \think\Db::name('market_config')->insert(['key' => $key, 'value' => $value]);
+            }
+        }
+        return true;
+    }
+
+    public static function marketConfigValue($key, $default = null)
+    {
+        $value = \think\Db::name('market_config')->where('key', $key)->value('value');
+        if ($value !== null) {
+            return $value;
+        }
+        $configFile = dirname(__DIR__) . '/config.php';
+        if (file_exists($configFile)) {
+            $tempArr = (include $configFile);
+            if (!empty($tempArr) && is_array($tempArr) && isset($tempArr[$key])) {
+                return $tempArr[$key]['value'] ?? $default;
+            }
+        }
+        return $default;
+    }
+
     public static function getEscrowUid()
     {
-        $config = \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->value('config');
-        $config = $config ? json_decode($config, true) : [];
-        $defaultConfig = (new \addons\market\MarketPlugin())->getDefaultConfig();
-        $config = array_merge($defaultConfig, $config);
+        $config = self::marketConfig();
         return intval($config['escrow_uid'] ?? 0);
     }
 }

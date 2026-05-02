@@ -6,12 +6,7 @@ class MarketApiController
 {
     private function getConfig()
     {
-        $dbConfig = \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->value('config');
-        $dbConfig = $dbConfig ? json_decode($dbConfig, true) : [];
-        $Market = new \addons\market\MarketPlugin();
-        return array_merge($Market->getDefaultConfig(), $dbConfig);
+        return \addons\market\model\MarketModel::marketConfig();
     }
 
     private function getUid()

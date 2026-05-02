@@ -97,12 +97,6 @@ class MarketHooks
 
     private function getMarketConfig()
     {
-        $config = \think\Db::name('plugin')
-            ->where('name', 'Market')->where('module', 'addons')
-            ->value('config');
-        $config = $config ? json_decode($config, true) : [];
-
-        $defaultConfig = (new \addons\market\MarketPlugin())->getDefaultConfig();
-        return array_merge($defaultConfig, $config);
+        return \addons\market\model\MarketModel::marketConfig();
     }
 }
