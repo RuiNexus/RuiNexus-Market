@@ -294,6 +294,8 @@ class MarketApiController
             ->where('id', $listing['uid'])
             ->value('username') ?: '未知卖家';
 
+        $sellerName = preg_replace('/\(\d+\.\d+\.\d+\.\d+\)$/', '', $sellerName);
+
         $config = $this->getConfig();
 
         if ($payType == 'offline' && intval($config['allow_offline'] ?? 1) != 1) {
