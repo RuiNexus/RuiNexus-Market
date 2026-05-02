@@ -103,7 +103,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time')
+            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time,a.billing_cycle,a.original_amount')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
@@ -128,9 +128,13 @@ class MarketApiController
         foreach ($list as &$v) {
             $hostId = \think\Db::name('market_listing')->where('id', $v['id'])->value('host_id');
             $host   = $hosts[$hostId] ?? [];
-            $v['remaining_days'] = 0;
-            if (!empty($host['nextduedate']) && $host['nextduedate'] > time()) {
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['remaining_days'] = null;
+            } elseif (!empty($host['nextduedate']) && $host['nextduedate'] > time()) {
                 $v['remaining_days'] = ceil(($host['nextduedate'] - time()) / 86400);
+            } else {
+                $v['remaining_days'] = 0;
             }
             $v['domainstatus'] = $host['domainstatus'] ?? '';
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
@@ -163,9 +167,13 @@ class MarketApiController
         \think\Db::name('market_listing')->where('id', $id)->setInc('views', 1);
 
         $host = \think\Db::name('host')->where('id', $listing['host_id'])->find();
-        $listing['remaining_days'] = 0;
-        if ($host && $host['nextduedate'] > time()) {
+        $billingCycle = strtolower($listing['billing_cycle'] ?? '');
+        if (in_array($billingCycle, ['onetime', 'free'])) {
+            $listing['remaining_days'] = null;
+        } elseif ($host && $host['nextduedate'] > time()) {
             $listing['remaining_days'] = ceil(($host['nextduedate'] - time()) / 86400);
+        } else {
+            $listing['remaining_days'] = 0;
         }
         $listing['host_domainstatus'] = $host['domainstatus'] ?? '';
         $listing['spec_data'] = $listing['spec_data'] ? json_decode($listing['spec_data'], true) : null;
@@ -320,7 +328,7 @@ class MarketApiController
         }
 
         $product = \think\Db::name('products')
-            ->field('name,type,pay_type')
+            ->field('name,type')
             ->where('id', $host['productid'])->find();
 
         $price = \think\Db::name('pricing')
@@ -328,12 +336,9 @@ class MarketApiController
             ->where('relid', $host['productid'])
             ->find();
 
-        $originalAmount = 0;
-        if ($price && floatval($price['monthly'] ?? 0) > 0) {
-            $originalAmount = floatval($price['monthly']);
-        } elseif ($price) {
-            $originalAmount = floatval($price['onetime'] ?? 0);
-        }
+        $originalAmount = \addons\market\model\MarketModel::getPriceFromPricing(
+            $host['billingcycle'] ?? '', $price
+        );
 
         $title       = input('title', $product['name'] ?? '');
         $description = input('description', '');
@@ -357,11 +362,7 @@ class MarketApiController
         $needAudit = intval($config['need_audit'] ?? 1);
         $initialStatus = $needAudit ? 0 : 1;
 
-        $payType = json_decode($product['pay_type'] ?? '{}', true);
-        $billingCycle = '';
-        if ($payType && isset($payType['pay_type'])) {
-            $billingCycle = $payType['pay_type'];
-        }
+        $billingCycle = $host['billingcycle'] ?? '';
 
         $listingData = [
             'uid'             => $uid,
@@ -499,7 +500,7 @@ class MarketApiController
             ->column('host_id');
 
         $hosts = \think\Db::name('host')->alias('h')
-            ->field('h.id,h.productid,h.regdate,h.nextduedate,h.domainstatus,p.name as product_name,p.type as product_type')
+            ->field('h.id,h.productid,h.regdate,h.nextduedate,h.billingcycle,h.domainstatus,p.name as product_name,p.type as product_type')
             ->leftJoin('products p', 'h.productid = p.id')
             ->where(function ($query) use ($uid, $escrowHostIds) {
                 $query->where('h.uid', $uid)->where('h.domainstatus', 'Active');
@@ -526,14 +527,14 @@ class MarketApiController
                 ->where('type', 'product')
                 ->where('relid', $h['productid'])
                 ->find();
-            $h['original_amount'] = 0;
-            if ($price && floatval($price['monthly'] ?? 0) > 0) {
-                $h['original_amount'] = floatval($price['monthly']);
-            } elseif ($price) {
-                $h['original_amount'] = floatval($price['onetime'] ?? 0);
-            }
+            $h['original_amount'] = \addons\market\model\MarketModel::getPriceFromPricing(
+                $h['billingcycle'] ?? '', $price
+            );
 
-            if ($h['nextduedate'] > time()) {
+            $billingCycle = strtolower($h['billingcycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $h['remaining_days'] = null;
+            } elseif ($h['nextduedate'] > time()) {
                 $h['remaining_days'] = ceil(($h['nextduedate'] - time()) / 86400);
             } else {
                 $h['remaining_days'] = 0;

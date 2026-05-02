@@ -473,7 +473,7 @@ class AdminIndexController extends PluginAdminBaseController
             ->column('host_id');
 
         $hosts = \think\Db::name('host')->alias('h')
-            ->field('h.id,h.domain,h.dedicatedip,h.os,h.port,h.domainstatus,h.productid,h.regdate,h.nextduedate,p.name as product_name,p.type as product_type,p.pay_type')
+            ->field('h.id,h.domain,h.dedicatedip,h.os,h.port,h.domainstatus,h.productid,h.regdate,h.nextduedate,h.billingcycle,p.name as product_name,p.type as product_type')
             ->leftJoin('products p', 'h.productid = p.id')
             ->where(function ($query) use ($uid, $escrowHostIds) {
                 $query->where('h.uid', $uid);
@@ -510,15 +510,11 @@ class AdminIndexController extends PluginAdminBaseController
                 ->where('type', 'product')
                 ->where('relid', $host['productid'])
                 ->find();
-            $host['original_amount'] = 0;
-            if ($price && floatval($price['monthly'] ?? 0) > 0) {
-                $host['original_amount'] = floatval($price['monthly']);
-            } elseif ($price) {
-                $host['original_amount'] = floatval($price['onetime'] ?? 0);
-            }
+            $host['original_amount'] = \addons\market\model\MarketModel::getPriceFromPricing(
+                $host['billingcycle'] ?? '', $price
+            );
 
-            $payTypes = json_decode($host['pay_type'] ?? '{}', true);
-            $host['billing_cycle'] = $payTypes['pay_type'] ?? '';
+            $host['billing_cycle'] = $host['billingcycle'] ?? '';
         }
 
         return json([
@@ -567,22 +563,18 @@ class AdminIndexController extends PluginAdminBaseController
         }
 
         $product = \think\Db::name('products')
-            ->field('name,type,pay_type')
+            ->field('name,type')
             ->where('id', $host['productid'])->find();
 
         $price = \think\Db::name('pricing')
             ->where('type', 'product')
             ->where('relid', $host['productid'])
             ->find();
-        $originalAmount = 0;
-        if ($price && floatval($price['monthly'] ?? 0) > 0) {
-            $originalAmount = floatval($price['monthly']);
-        } elseif ($price) {
-            $originalAmount = floatval($price['onetime'] ?? 0);
-        }
+        $originalAmount = \addons\market\model\MarketModel::getPriceFromPricing(
+            $host['billingcycle'] ?? '', $price
+        );
 
-        $payType = json_decode($product['pay_type'] ?? '{}', true);
-        $billingCycle = $payType['pay_type'] ?? '';
+        $billingCycle = $host['billingcycle'] ?? '';
 
         $title = $product['name'] ?? '未命名服务器';
 

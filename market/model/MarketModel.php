@@ -94,6 +94,29 @@ class MarketModel extends Model
         return $default;
     }
 
+    public static function getPriceFromPricing($billingCycle, $pricingRow)
+    {
+        if (empty($pricingRow)) {
+            return 0;
+        }
+
+        $cycle = strtolower($billingCycle);
+
+        if ($cycle === 'free') {
+            return 0;
+        }
+
+        if (isset($pricingRow[$cycle]) && floatval($pricingRow[$cycle]) > 0) {
+            return floatval($pricingRow[$cycle]);
+        }
+
+        if (floatval($pricingRow['monthly'] ?? 0) > 0) {
+            return floatval($pricingRow['monthly']);
+        }
+
+        return floatval($pricingRow['onetime'] ?? 0);
+    }
+
     public static function getEscrowUid()
     {
         $config = self::marketConfig();
