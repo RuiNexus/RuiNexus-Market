@@ -6,7 +6,7 @@ class MarketHooks
 {
     public function invoice_paid($param)
     {
-        $invoiceId = intval($param['invoiceid'] ?? 0);
+        $invoiceId = intval($param['invoiceid'] ?? $param['invoice_id'] ?? 0);
         if ($invoiceId <= 0) {
             return;
         }
