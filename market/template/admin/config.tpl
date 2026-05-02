@@ -15,12 +15,15 @@
               {/foreach}
             </div>
           </div>
+          <div class="text-center mb-3">
+            <span style="color:#999;font-size:13px;font-style:italic;">君知所向，故无所惧。</span>
+          </div>
           <div class="help-block">
             配置RuiNexus Market二手服务器交易市场的各项参数
           </div>
 
           <form method="post" action="{:shd_addon_url('market://AdminIndex/configPost')}" class="needs-validation" novalidate>
-            <div class="card-body px-5 mx-auto w-75">
+            <div class="px-5 mx-auto w-75">
               <div class="row">
                 <div class="col-sm-6 col-12">
                   <div class="form-group">
@@ -91,11 +94,117 @@
               </div>
             </div>
           </form>
+
+          <hr class="my-4">
+
+          <div class="card-title">
+            <h5 class="m-0">自定义配置字段</h5>
+            <small class="text-muted">卖家在上架时可以自定义填写这些配置信息，如CPU、内存、带宽等</small>
+          </div>
+
+          <div>
+            <div class="mb-2">
+              <button class="btn btn-primary w-xs" id="addFieldBtn"><i class="fas fa-plus"></i> 新增字段</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                  <tr>
+                    <th class="center" style="width:60px;">ID</th>
+                    <th style="width:120px;">标识</th>
+                    <th>显示名</th>
+                    <th class="center" style="width:100px;">类型</th>
+                    <th style="width:200px;">选项</th>
+                    <th class="center" style="width:60px;">排序</th>
+                    <th class="center" style="width:60px;">必填</th>
+                    <th class="center" style="width:120px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="fieldTbody">
+                  {foreach $fields as $f}
+                  <tr>
+                    <td class="center">{$f.id}</td>
+                    <td><code>{$f.field_name}</code></td>
+                    <td>{$f.field_label}</td>
+                    <td class="center">
+                      {if $f.field_type == 'input'}文本框
+                      {elseif $f.field_type == 'dropdown'}下拉
+                      {elseif $f.field_type == 'radio'}单选
+                      {elseif $f.field_type == 'checkbox'}多选
+                      {else}{$f.field_type}{/if}
+                    </td>
+                    <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                      {if $f.field_options}{$f.field_options}{else}--{/if}
+                    </td>
+                    <td class="center">{$f.sort_order}</td>
+                    <td class="center">{if $f.is_required}是{else}否{/if}</td>
+                    <td class="center">
+                      <a class="btn btn-link edit-field" data-id="{$f.id}" data-name="{$f.field_name}" data-label="{$f.field_label}" data-type="{$f.field_type}" data-options="{$f.field_options|htmlspecialchars}" data-order="{$f.sort_order}" data-required="{$f.is_required}">编辑</a>
+                      <a class="btn btn-link red del-field" data-id="{$f.id}">删除</a>
+                    </td>
+                  </tr>
+                  {/foreach}
+                  {if empty($fields)}
+                  <tr><td colspan="8" class="text-center text-muted">暂无自定义字段，点击"新增字段"添加</td></tr>
+                  {/if}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<div class="modal fade" id="fieldModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="fieldModalTitle">新增字段</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editFieldId" value="0">
+        <div class="form-group">
+          <label>字段标识 <small class="text-muted">(小写字母开头，如 cpu、ram、bandwidth)</small></label>
+          <input type="text" class="form-control" id="fieldName" placeholder="cpu">
+        </div>
+        <div class="form-group">
+          <label>显示名</label>
+          <input type="text" class="form-control" id="fieldLabel" placeholder="CPU 核心">
+        </div>
+        <div class="form-group">
+          <label>字段类型</label>
+          <select class="form-control" id="fieldType">
+            <option value="input">文本框 (input)</option>
+            <option value="dropdown">下拉选择 (dropdown)</option>
+            <option value="radio">单选 (radio)</option>
+            <option value="checkbox">多选 (checkbox)</option>
+          </select>
+        </div>
+        <div class="form-group" id="optionsGroup" style="display:none;">
+          <label>选项 <small class="text-muted">(每行一个)</small></label>
+          <textarea class="form-control" id="fieldOptions" rows="4" placeholder="16核&#10;32核&#10;64核"></textarea>
+        </div>
+        <div class="form-group">
+          <label>排序</label>
+          <input type="number" class="form-control" id="fieldOrder" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="fieldRequired">
+            <label class="form-check-label" for="fieldRequired">必填</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="saveFieldBtn">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.bootcdn.net/ajax/libs/layer/3.5.1/layer.js"></script>
 <script type="text/javascript">
@@ -121,6 +230,109 @@ $(function () {
         layer.msg('保存失败', {icon: 5});
         btn.prop('disabled', false).text('保存配置');
       }
+    });
+  });
+
+  $('#fieldType').on('change', function () {
+    var type = $(this).val();
+    if (type == 'dropdown' || type == 'radio' || type == 'checkbox') {
+      $('#optionsGroup').show();
+    } else {
+      $('#optionsGroup').hide();
+    }
+  });
+
+  $('#addFieldBtn').on('click', function () {
+    $('#editFieldId').val(0);
+    $('#fieldModalTitle').text('新增字段');
+    $('#fieldName').val('').prop('readonly', false);
+    $('#fieldLabel').val('');
+    $('#fieldType').val('input');
+    $('#fieldOptions').val('');
+    $('#fieldOrder').val(0);
+    $('#fieldRequired').prop('checked', false);
+    $('#optionsGroup').hide();
+    $('#fieldModal').modal('show');
+  });
+
+  $(document).on('click', '.edit-field', function () {
+    var $this = $(this);
+    $('#editFieldId').val($this.data('id'));
+    $('#fieldModalTitle').text('编辑字段');
+    $('#fieldName').val($this.data('name')).prop('readonly', true);
+    $('#fieldLabel').val($this.data('label'));
+    $('#fieldType').val($this.data('type')).trigger('change');
+    var opts = $this.data('options');
+    if (opts) {
+      try {
+        var arr = JSON.parse(opts);
+        $('#fieldOptions').val(arr.join('\n'));
+      } catch(e) {
+        $('#fieldOptions').val(opts);
+      }
+    } else {
+      $('#fieldOptions').val('');
+    }
+    $('#fieldOrder').val($this.data('order'));
+    $('#fieldRequired').prop('checked', parseInt($this.data('required')) == 1);
+    $('#fieldModal').modal('show');
+  });
+
+  $('#saveFieldBtn').on('click', function () {
+    var id = $('#editFieldId').val();
+    var name = $('#fieldName').val().trim();
+    var label = $('#fieldLabel').val().trim();
+    var type = $('#fieldType').val();
+    var options = $('#fieldOptions').val();
+    var order = $('#fieldOrder').val();
+    var required = $('#fieldRequired').is(':checked') ? 1 : 0;
+
+    if (!name) { layer.msg('请输入字段标识', {icon: 5}); return; }
+    if (!label) { layer.msg('请输入显示名', {icon: 5}); return; }
+
+    var btn = $(this);
+    btn.prop('disabled', true).text('保存中...');
+    $.ajax({
+      type: 'POST',
+      url: '{:shd_addon_url("market://AdminIndex/saveField")}',
+      data: { id: id, field_name: name, field_label: label, field_type: type, field_options: options, sort_order: order, is_required: required },
+      dataType: 'json',
+      success: function (res) {
+        if (res.status == 200) {
+          layer.msg(res.msg, {icon: 1, time: 1500});
+          $('#fieldModal').modal('hide');
+          setTimeout(function () { location.reload(); }, 1500);
+        } else {
+          layer.msg(res.msg, {icon: 5});
+        }
+        btn.prop('disabled', false).text('保存');
+      },
+      error: function () {
+        layer.msg('保存失败', {icon: 5});
+        btn.prop('disabled', false).text('保存');
+      }
+    });
+  });
+
+  $(document).on('click', '.del-field', function () {
+    var id = $(this).data('id');
+    layer.confirm('确定要删除这个字段吗？<br><small class="text-muted">已上架商品的 spec_data 不受影响</small>', {
+      btn: ['确定删除', '取消']
+    }, function () {
+      $.ajax({
+        type: 'POST',
+        url: '{:shd_addon_url("market://AdminIndex/deleteField")}',
+        data: { id: id },
+        dataType: 'json',
+        success: function (res) {
+          if (res.status == 200) {
+            layer.msg(res.msg, {icon: 1, time: 1500});
+            setTimeout(function () { location.reload(); }, 1500);
+          } else {
+            layer.msg(res.msg, {icon: 5});
+          }
+        }
+      });
     });
   });
 });
