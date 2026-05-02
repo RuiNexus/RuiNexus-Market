@@ -103,7 +103,7 @@ class MarketApiController
             ->where($where)->count();
 
         $list = \think\Db::name('market_listing')->alias('a')
-            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time')
+            ->field('a.id,a.title,a.sale_price,a.spec_data,a.product_id,a.product_name,a.product_type,a.nextduedate,a.regdate,a.is_featured,a.views,a.create_time')
             ->leftJoin('host h', 'a.host_id = h.id')
             ->where($where)
             ->order($order[0] ?? 'a.is_featured', $order[1] ?? 'desc')
