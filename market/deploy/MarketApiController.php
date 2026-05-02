@@ -410,28 +410,26 @@ class MarketApiController
             return json(['status' => 400, 'msg' => '订单状态不允许取消']);
         }
 
-        \think\Db::startTrans();
-        try {
-            if ($order['invoice_id'] > 0) {
+        if ($order['invoice_id'] > 0) {
+            $invoice = \think\Db::name('invoices')
+                ->where('id', $order['invoice_id'])
+                ->where('delete_time', 0)
+                ->find();
+            if ($invoice) {
                 \think\Db::name('invoices')
                     ->where('id', $order['invoice_id'])
-                    ->useSoftDelete('delete_time', time())
-                    ->delete();
+                    ->update(['status' => 'Cancelled', 'update_time' => time()]);
+                hook('invoice_mark_cancelled', ['invoiceid' => $order['invoice_id']]);
             }
-
+        } else {
             \think\Db::name('market_order')->where('id', $orderId)->update([
                 'status' => 4,
                 'remark' => '买家主动取消',
             ]);
-
             \addons\market\model\MarketModel::unlockListing($order['listing_id']);
-
-            \think\Db::commit();
-            return json(['status' => 200, 'msg' => '订单已取消']);
-        } catch (\Exception $e) {
-            \think\Db::rollback();
-            return json(['status' => 400, 'msg' => '取消失败: ' . $e->getMessage()]);
         }
+
+        return json(['status' => 200, 'msg' => '订单已取消']);
     }
 
     public function create()

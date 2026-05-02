@@ -109,6 +109,32 @@ class MarketHooks
         }
     }
 
+    public function invoice_mark_cancelled($param)
+    {
+        $invoiceId = intval($param['invoiceid'] ?? 0);
+        if ($invoiceId <= 0) {
+            return;
+        }
+
+        $order = \think\Db::name('market_order')
+            ->where('invoice_id', $invoiceId)
+            ->find();
+        if (!$order) {
+            return;
+        }
+
+        if ($order['status'] != 0) {
+            return;
+        }
+
+        \think\Db::name('market_order')->where('id', $order['id'])->update([
+            'status' => 4,
+            'remark' => '账单取消，订单自动取消',
+        ]);
+
+        \addons\market\model\MarketModel::unlockListing($order['listing_id']);
+    }
+
     private function getMarketConfig()
     {
         return \addons\market\model\MarketModel::marketConfig();
