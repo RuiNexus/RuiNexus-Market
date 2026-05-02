@@ -12,7 +12,7 @@ class MarketPlugin extends Plugin
         'description' => '二手服务器转卖交易市场',
         'status'      => 1,
         'author'      => 'RuiNexus/YeHuaiJing',
-        'version'     => '1.2.1',
+        'version'     => '1.3.0',
         'module'      => 'addons',
         'lang'        => [
             'chinese'     => 'RuiNexus Market',
@@ -186,28 +186,84 @@ class MarketPlugin extends Plugin
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ];
 
+        $columnDefs = [
+            'market_config' => [
+                "`id` int(11) NOT NULL AUTO_INCREMENT",
+                "`key` varchar(100) NOT NULL",
+                "`value` text",
+            ],
+            'market_listing' => [
+                "`id` int(11) NOT NULL AUTO_INCREMENT",
+                "`uid` int(11) NOT NULL COMMENT '卖家用户ID'",
+                "`host_id` int(11) NOT NULL COMMENT '关联的host ID'",
+                "`product_id` int(11) NOT NULL COMMENT '关联的产品ID'",
+                "`title` varchar(255) NOT NULL COMMENT '标题'",
+                "`description` text COMMENT '描述'",
+                "`sale_price` decimal(10,2) NOT NULL COMMENT '售价'",
+                "`host_domain` varchar(255) DEFAULT '' COMMENT '主机名'",
+                "`host_os` varchar(255) DEFAULT '' COMMENT '操作系统'",
+                "`host_ip` varchar(255) DEFAULT '' COMMENT '主IP'",
+                "`host_port` int(11) DEFAULT '0' COMMENT '端口'",
+                "`product_name` varchar(255) DEFAULT '' COMMENT '产品名称'",
+                "`product_type` varchar(50) DEFAULT '' COMMENT '产品类型'",
+                "`billing_cycle` varchar(100) DEFAULT '' COMMENT '付款周期'",
+                "`nextduedate` int(11) DEFAULT '0' COMMENT '到期时间'",
+                "`regdate` int(11) DEFAULT '0' COMMENT '开通时间'",
+                "`original_amount` decimal(10,2) DEFAULT '0.00' COMMENT '原价'",
+                "`status` tinyint(1) DEFAULT '0' COMMENT '0待审核1上架2已售3下架4删除'",
+                "`is_featured` tinyint(1) DEFAULT '0' COMMENT '推荐'",
+                "`sort_order` int(11) DEFAULT '0'",
+                "`views` int(11) DEFAULT '0'",
+                "`create_time` int(11) DEFAULT '0'",
+                "`update_time` int(11) DEFAULT '0'",
+            ],
+            'market_order' => [
+                "`id` int(11) NOT NULL AUTO_INCREMENT",
+                "`listing_id` int(11) NOT NULL",
+                "`host_id` int(11) NOT NULL COMMENT '原始host ID'",
+                "`seller_uid` int(11) NOT NULL",
+                "`buyer_uid` int(11) NOT NULL",
+                "`invoice_id` int(11) DEFAULT '0' COMMENT '关联账单ID'",
+                "`amount` decimal(10,2) NOT NULL COMMENT '实际支付金额'",
+                "`fee` decimal(10,2) DEFAULT '0.00' COMMENT '手续费'",
+                "`seller_amount` decimal(10,2) DEFAULT '0.00' COMMENT '卖家实收'",
+                "`pay_type` varchar(20) DEFAULT 'online' COMMENT 'online线上 offline线下'",
+                "`status` tinyint(1) DEFAULT '0' COMMENT '0待付款1已付款2已转移3完成4取消5退款中6已退款'",
+                "`remark` text",
+                "`create_time` int(11) DEFAULT '0'",
+                "`pay_time` int(11) DEFAULT '0'",
+                "`transfer_time` int(11) DEFAULT '0'",
+                "`complete_time` int(11) DEFAULT '0'",
+            ],
+            'market_favorite' => [
+                "`id` int(11) NOT NULL AUTO_INCREMENT",
+                "`uid` int(11) NOT NULL",
+                "`listing_id` int(11) NOT NULL",
+                "`create_time` int(11) DEFAULT '0'",
+            ],
+        ];
+
         foreach ($tables as $suffix => $createSql) {
             $tableName = $prefix . $suffix;
             if (!in_array($tableName, $tableList)) {
                 \think\Db::execute($createSql);
+            } else {
+                $existing = \think\Db::query("SHOW COLUMNS FROM `{$tableName}`");
+                $existingNames = array_column($existing, 'Field');
+                foreach ($columnDefs[$suffix] as $colDef) {
+                    preg_match('/`(\w+)`/', $colDef, $m);
+                    if (!$m) continue;
+                    $colName = $m[1];
+                    if (!in_array($colName, $existingNames)) {
+                        \think\Db::execute("ALTER TABLE `{$tableName}` ADD COLUMN {$colDef}");
+                    }
+                }
             }
         }
     }
 
     private function dropTables()
     {
-        $DbConfig = \think\Db::getConfig();
-        $prefix = $DbConfig['prefix'];
-
-        $tables = [
-            $prefix . 'market_favorite',
-            $prefix . 'market_order',
-            $prefix . 'market_listing',
-            $prefix . 'market_config',
-        ];
-        foreach ($tables as $table) {
-            \think\Db::execute("DROP TABLE IF EXISTS `{$table}`");
-        }
     }
 
     private function deployApi()
