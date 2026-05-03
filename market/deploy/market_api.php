@@ -11,9 +11,10 @@
  * 开发者: RuiNexus / YeHuaiJing
  */
 
-header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Credentials: true');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
@@ -50,6 +51,7 @@ $routes = [
     ['method' => 'GET',     'action' => 'favorites',    'handler' => 'favorites'],
     ['method' => 'GET',     'action' => 'fields',       'handler' => 'fields'],
     ['method' => 'POST',    'action' => 'cancelOrder',  'handler' => 'cancelOrder'],
+    ['method' => 'GET',     'action' => 'me',           'handler' => 'me'],
 ];
 
 $matched = false;

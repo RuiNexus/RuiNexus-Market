@@ -461,6 +461,24 @@ class MarketApiController
         return json(['status' => 200, 'msg' => '订单已取消']);
     }
 
+    public function me()
+    {
+        $uid = $this->getUid();
+        if ($uid > 0) {
+            $user = \think\Db::name('clients')->field('id,username')->where('id', $uid)->find();
+            return json(['status' => 200, 'data' => [
+                'id'       => $uid,
+                'username' => $user['username'] ?? '',
+                'loggedIn' => true,
+            ]]);
+        }
+        return json(['status' => 200, 'data' => [
+            'id'       => 0,
+            'username' => '',
+            'loggedIn' => false,
+        ]]);
+    }
+
     public function create()
     {
         $uid = $this->needLogin();
