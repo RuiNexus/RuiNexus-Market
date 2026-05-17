@@ -547,6 +547,8 @@ class MarketApiController
 
         $billingCycle = $host['billingcycle'] ?? '';
 
+        $notes = input('notes', '');
+
         $listingData = [
             'uid'             => $uid,
             'host_id'         => $hostId,
@@ -561,6 +563,7 @@ class MarketApiController
             'nextduedate'     => intval($host['nextduedate'] ?? 0),
             'regdate'         => intval($host['regdate'] ?? 0),
             'original_amount' => $originalAmount,
+            'notes'           => $notes,
             'status'          => $initialStatus,
             'create_time'     => time(),
             'update_time'     => time(),
@@ -623,6 +626,10 @@ class MarketApiController
             if (is_array($specData)) {
                 $update['spec_data'] = json_encode($specData, JSON_UNESCAPED_UNICODE);
             }
+        }
+        $notes = input('notes', '');
+        if ($notes !== '') {
+            $update['notes'] = $notes;
         }
 
         if (empty($update)) {
