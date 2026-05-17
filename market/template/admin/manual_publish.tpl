@@ -230,6 +230,10 @@ function showPublishDialog(uid, hostId, price, btn) {
     content: '<div style="padding:20px;">' +
       '<p>确认将主机 <strong>#' + hostId + '</strong> 以 <strong>¥' + price + '</strong> 直接上架？</p>' +
       specHtml +
+      '<div class="form-group" style="margin-top:10px;">' +
+      '<label style="font-weight:bold;margin-bottom:5px;display:block;">卖家备注</label>' +
+      '<textarea id="publishNotes" class="form-control" rows="2" placeholder="给买家看的备注信息（可选）"></textarea>' +
+      '</div>' +
       '<div style="text-align:right;margin-top:15px;">' +
       '<button class="btn btn-secondary" onclick="layer.closeAll()" style="margin-right:10px;padding:6px 20px;">取消</button>' +
       '<button class="btn btn-primary" id="confirmPublishBtn" style="padding:6px 20px;">确认上架</button>' +
@@ -238,13 +242,14 @@ function showPublishDialog(uid, hostId, price, btn) {
     success: function () {
       $('#confirmPublishBtn').off('click').on('click', function () {
         var specData = collectSpecData();
-        doPublish(uid, hostId, price, specData, btn);
+        var notes = $('#publishNotes').val() || '';
+        doPublish(uid, hostId, price, specData, notes, btn);
       });
     }
   });
 }
 
-function doPublish(uid, hostId, price, specData, btn) {
+function doPublish(uid, hostId, price, specData, notes, btn) {
   btn.prop('disabled', true).text('处理中...');
   $.ajax({
     type: 'POST',
@@ -253,7 +258,8 @@ function doPublish(uid, hostId, price, specData, btn) {
       uid: uid,
       host_id: hostId,
       sale_price: price,
-      spec_data: JSON.stringify(specData)
+      spec_data: JSON.stringify(specData),
+      notes: notes
     },
     dataType: 'json',
     success: function (res) {

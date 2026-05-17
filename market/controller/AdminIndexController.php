@@ -620,6 +620,7 @@ class AdminIndexController extends PluginAdminBaseController
         $hostId    = intval(input('host_id'));
         $desc      = input('description', '');
         $salePrice = floatval(input('sale_price', 0));
+        $notes     = input('notes', '');
 
         if ($uid <= 0 || $hostId <= 0) {
             return json(['status' => 400, 'msg' => '参数错误']);
@@ -691,6 +692,7 @@ class AdminIndexController extends PluginAdminBaseController
             'nextduedate'     => intval($host['nextduedate'] ?? 0),
             'regdate'         => intval($host['regdate'] ?? 0),
             'original_amount' => $originalAmount,
+            'notes'           => $notes,
             'status'          => 1,
             'create_time'     => time(),
             'update_time'     => time(),
