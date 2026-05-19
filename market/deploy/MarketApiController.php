@@ -615,6 +615,10 @@ class MarketApiController
         if ($salePrice >= 0) {
             $update['sale_price'] = $salePrice;
         }
+        $status = intval(input('status', -1));
+        if ($status === 1 && $listing['status'] === 3) {
+            $update['status'] = 1;
+        }
         $specData = input('spec_data', '', null);
         if ($specData !== '') {
             if (is_string($specData)) {
