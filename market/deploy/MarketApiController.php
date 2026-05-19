@@ -617,6 +617,11 @@ class MarketApiController
         }
         $status = intval(input('status', -1));
         if ($status === 1 && $listing['status'] === 3) {
+            $config = $this->getConfig();
+            $blacklist = array_filter(array_map('intval', explode(',', $config['product_blacklist'] ?? '')));
+            if (in_array($listing['product_id'], $blacklist)) {
+                return json(['status' => 400, 'msg' => '该产品类型不允许在市场上交易，无法重新上架']);
+            }
             $update['status'] = 1;
         }
         $specData = input('spec_data', '', null);
