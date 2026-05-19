@@ -25,6 +25,14 @@
 
 ---
 
+## 📦 安装前提
+
+**本插件需要与前端站点配合使用，请同时安装：**
+
+👉 **[RuiNexus Market Frontend](https://github.com/RuiNexus/RuiNexus-Market-Frontend)** — 前端独立站点
+
+---
+
 ## 简介
 
 RuiNexus Market 是一个基于魔方财务系统的二手服务器转卖插件。卖家可以从自己账户下已有的服务器（host）中选择上架售卖，买家可通过独立前端站点浏览和购买。
