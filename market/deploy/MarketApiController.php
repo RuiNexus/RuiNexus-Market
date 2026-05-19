@@ -401,7 +401,7 @@ class MarketApiController
 
             \think\Db::commit();
 
-            $rootUrl = getRootUrl();
+            $rootUrl = request()->domain();
             return json([
                 'status' => 200,
                 'data'   => [
