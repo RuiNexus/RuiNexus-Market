@@ -756,10 +756,29 @@ class MarketApiController
             ->where('uid', $uid)->where('status', '<>', 4)
             ->order('id', 'desc')->page($page, $size)->select()->toArray();
 
+        $hostIds = array_column($list, 'host_id');
+        $hosts = [];
+        if (!empty($hostIds)) {
+            $hosts = \think\Db::name('host')
+                ->whereIn('id', $hostIds)
+                ->column('nextduedate', 'id');
+        }
+
         $specLabels = \think\Db::name('market_config_field')
             ->column('field_label', 'field_name');
 
         foreach ($list as &$v) {
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['remaining_days'] = null;
+            } else {
+                $hostNextDue = $hosts[$v['host_id']] ?? $v['nextduedate'];
+                if (!empty($hostNextDue) && $hostNextDue > time()) {
+                    $v['remaining_days'] = ceil(($hostNextDue - time()) / 86400);
+                } else {
+                    $v['remaining_days'] = 0;
+                }
+            }
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
         }
 
@@ -848,10 +867,29 @@ class MarketApiController
             ->where('f.uid', $uid)->where('l.status', 'in', [0, 1])
             ->order('f.id', 'desc')->page($page, $size)->select()->toArray();
 
+        $hostIds = array_column($list, 'host_id');
+        $hosts = [];
+        if (!empty($hostIds)) {
+            $hosts = \think\Db::name('host')
+                ->whereIn('id', $hostIds)
+                ->column('nextduedate', 'id');
+        }
+
         $specLabels = \think\Db::name('market_config_field')
             ->column('field_label', 'field_name');
 
         foreach ($list as &$v) {
+            $billingCycle = strtolower($v['billing_cycle'] ?? '');
+            if (in_array($billingCycle, ['onetime', 'free'])) {
+                $v['remaining_days'] = null;
+            } else {
+                $hostNextDue = $hosts[$v['host_id']] ?? $v['nextduedate'];
+                if (!empty($hostNextDue) && $hostNextDue > time()) {
+                    $v['remaining_days'] = ceil(($hostNextDue - time()) / 86400);
+                } else {
+                    $v['remaining_days'] = 0;
+                }
+            }
             $v['spec_data'] = $v['spec_data'] ? json_decode($v['spec_data'], true) : null;
         }
 
